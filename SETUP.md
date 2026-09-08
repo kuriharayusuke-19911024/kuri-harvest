@@ -82,6 +82,17 @@ const API_URL='https://script.google.com/macros/s/AKfycb.../exec';
 
 ## ③ GitHub に置いて3人で使えるようにする
 
+> ### ✅ 3-1 〜 3-3 は実施済みです
+>
+> - リポジトリ： https://github.com/kuriharayusuke-19911024/kuri-harvest （Public）
+> - 公開URL： **https://kuriharayusuke-19911024.github.io/kuri-harvest/**
+> - Pages 有効化・初回ビルドまで完了、表示確認済み
+>
+> **②の手順5（API_URLの置換）がまだなので、今この URL を開いても
+> 画面下に「API_URL を設定してください」と出ます。** 置換して再アップロードすれば動きます。
+>
+> 以下 3-1〜3-3 は、作り直すときのための記録です。ふだんは ⑥ を見てください。
+
 ### 3-1. リポジトリを作る
 
 1. GitHub にログイン → 右上 **+** → **New repository**
@@ -170,6 +181,22 @@ https://kuriharayusuke-19911024.github.io/kuri-harvest/
 ---
 
 ## ⑥ コードを直したくなったら
+
+**GitHub にアップロードし直す方法（ブラウザ）**
+
+1. https://github.com/kuriharayusuke-19911024/kuri-harvest を開く
+2. 直したいファイル名をクリック → 右上の鉛筆マーク
+3. 編集して **Commit changes**
+4. 1〜2分待つと公開URLに反映されます
+
+**コマンドの場合**
+
+```bash
+cd "C:/Users/user/Documents/kuri-harvest"
+git add -A
+git commit -m "修正内容"
+git push
+```
 
 - **画面・文言を変える** → `index.html` を編集して GitHub に再アップロード
 - **保存の仕組みを変える** → `Code.gs` を編集したあと、

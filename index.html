@@ -71,22 +71,47 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
 .print-only{display:none}
 @media print{
   body *{visibility:hidden}
-  #doc,#doc *{visibility:visible}
-  #doc{position:absolute;left:0;top:0;width:100%;padding:20mm 15mm}
+  #doc,#doc *,#doc2,#doc2 *{visibility:visible}
+  #doc,#doc2{position:absolute;left:0;top:0;width:100%;padding:20mm 15mm}
 }
 #doc{font-size:13px;color:#000}
+#doc2{font-size:13px;color:#000}
 #doc h1{font-size:22px;text-align:center;letter-spacing:.3em;margin:0 0 20px;border-bottom:2px solid #000;padding-bottom:6px}
+#doc2 h1{font-size:22px;text-align:center;letter-spacing:.3em;margin:0 0 20px;border-bottom:2px solid #000;padding-bottom:6px}
 #doc .meta{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
+#doc2 .meta{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
 #doc .to{font-size:17px;border-bottom:1px solid #000;padding-bottom:4px}
+#doc2 .to{font-size:17px;border-bottom:1px solid #000;padding-bottom:4px}
 #doc .from{font-size:12px;line-height:1.6;text-align:right}
+#doc2 .from{font-size:12px;line-height:1.6;text-align:right}
 #doc table{border-collapse:collapse;width:100%;margin:10px 0;font-size:13px}
+#doc2 table{border-collapse:collapse;width:100%;margin:10px 0;font-size:13px}
 #doc th,#doc td{border:1px solid #000;padding:6px 8px;text-align:right;white-space:nowrap;color:#000}
+#doc2 th,#doc2 td{border:1px solid #000;padding:6px 8px;text-align:right;white-space:nowrap;color:#000}
 #doc th{background:#eee;font-weight:700;text-align:center;font-size:12px}
+#doc2 th{background:#eee;font-weight:700;text-align:center;font-size:12px}
 #doc td:nth-child(1),#doc td:nth-child(2),#doc td:nth-child(3){text-align:left}
+#doc2 td:nth-child(1),#doc2 td:nth-child(2),#doc2 td:nth-child(3){text-align:left}
 #doc .grand{font-size:18px;font-weight:700;text-align:right;margin:10px 0}
+#doc2 .grand{font-size:18px;font-weight:700;text-align:right;margin:10px 0}
 #doc .grand small{font-size:12px;font-weight:400;margin-left:12px}
+#doc2 .grand small{font-size:12px;font-weight:400;margin-left:12px}
 #doc .foot{font-size:12px;color:#333;margin-top:14px}
+#doc2 .foot{font-size:12px;color:#333;margin-top:14px}
 .docwrap{border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:12px;background:#fff}
+
+.mem{display:flex;flex-wrap:wrap;gap:6px}
+.mem button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font-size:14px;color:var(--sub);cursor:pointer}
+.mem button.on{background:var(--kuri);border-color:var(--kuri);color:#fff;font-weight:700}
+.task{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.task .tn{font-weight:700;margin-bottom:6px;color:var(--kuri-dk)}
+.daynav{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.daynav input{flex:1}
+.daynav button{width:auto;padding:10px 14px}
+.wk td{white-space:normal;font-size:12px;vertical-align:top;text-align:left}
+.wk th{text-align:center}
+.wk td.today,.wk th.today{background:var(--soft)}
+.wk td.sat{color:#2c5aa0}.wk td.sun{color:var(--red)}
 </style>
 </head>
 <body>
@@ -96,6 +121,8 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
     <button class="on" data-tab="harvest">収穫記録</button>
     <button data-tab="ship">出荷記録</button>
     <button data-tab="buy">買取</button>
+    <button data-tab="plan">予定</button>
+    <button data-tab="peel">内職</button>
     <button data-tab="stock">在庫</button>
     <button data-tab="list">履歴</button>
     <button data-tab="setting">設定</button>
@@ -157,7 +184,7 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
   <h3>この買取先の記録</h3>
   <div id="b-list"></div>
 
-  <h3>買取明細書（支払通知書）を作る</h3>
+  <h3>買取明細書(支払通知書)を作る</h3>
   <div class="row">
     <div><label>買取先</label><select id="d-sup"></select></div>
     <div><label>期間 開始</label><input type="date" id="d-from"></div>
@@ -171,6 +198,56 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
     <div class="row"><button class="btn sub" id="d-print">印刷 / PDF保存</button></div>
     <div class="docwrap"><div id="doc"></div></div>
   </div>
+</section>
+
+<!-- 内職（鬼皮剥き） -->
+<section id="tab-peel" hidden>
+  <h2>鬼皮剥き（内職）を記録</h2>
+  <div class="row">
+    <div><label>日付</label><input type="date" id="w-date"></div>
+    <div><label>作業者</label><select id="w-who"></select></div>
+  </div>
+  <div class="row" id="w-newwho" hidden><div><input id="w-newwho-name" placeholder="作業者の名前"></div><button class="btn sub" id="w-newwho-ok">この作業者を追加</button></div>
+  <div class="sizes" style="grid-template-columns:1fr 1fr">
+    <div class="sz"><label>良品（kg）</label><input type="number" step="0.1" min="0" inputmode="decimal" id="w-good" placeholder="0"><input type="number" min="0" inputmode="numeric" id="w-good-p" placeholder="円/kg" style="margin-top:4px;font-size:14px"></div>
+    <div class="sz"><label>傷あり（kg）</label><input type="number" step="0.1" min="0" inputmode="decimal" id="w-bad" placeholder="0"><input type="number" min="0" inputmode="numeric" id="w-bad-p" placeholder="円/kg" style="margin-top:4px;font-size:14px"></div>
+  </div>
+  <div class="total">合計 <b id="w-total">0</b> kg　／　支払 <b id="w-amt">0</b> 円</div>
+  <div class="row"><div><label>メモ</label><input id="w-memo" placeholder="原料の渡し量など"></div></div>
+  <button class="btn" id="w-save">記録する</button>
+
+  <h3>この作業者の記録</h3>
+  <div id="w-list"></div>
+
+  <h3>支払明細書を作る</h3>
+  <div class="row">
+    <div><label>作業者</label><select id="wd-who"></select></div>
+    <div><label>期間 開始</label><input type="date" id="wd-from"></div>
+    <div><label>期間 終了</label><input type="date" id="wd-to"></div>
+    <div><label>お支払日</label><input id="wd-pay" placeholder="例：10月31日"></div>
+  </div>
+  <button class="btn sub" id="wd-make">明細書を作成</button>
+  <p class="note">期間は空欄なら全期間で作成します。</p>
+  <div id="wd-area" hidden>
+    <div class="row"><button class="btn sub" id="wd-print">印刷 / PDF保存</button></div>
+    <div class="docwrap"><div id="doc2"></div></div>
+  </div>
+</section>
+
+<!-- 予定 -->
+<section id="tab-plan" hidden>
+  <h2>作業予定</h2>
+  <div class="daynav">
+    <button class="btn tiny" id="p-prev">◀</button>
+    <input type="date" id="p-date">
+    <button class="btn tiny" id="p-next">▶</button>
+  </div>
+  <div id="p-tasks"></div>
+  <div class="row"><div><label>メモ</label><input id="p-memo" placeholder="集合時間・持ち物など"></div></div>
+  <p class="note">名前をタップすると即保存されます。同じ人を複数の作業に入れることもできます。</p>
+
+  <h3>今後1週間</h3>
+  <div class="tw"><table class="wk" id="p-week"></table></div>
 </section>
 
 <!-- 在庫 -->
@@ -195,7 +272,7 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
 <section id="tab-list" hidden>
   <h2>履歴</h2>
   <div class="filter">
-    <select id="l-kind"><option value="all">すべて</option><option value="h">収穫のみ</option><option value="s">出荷のみ</option><option value="b">買取のみ</option></select>
+    <select id="l-kind"><option value="all">すべて</option><option value="h">収穫のみ</option><option value="s">出荷のみ</option><option value="b">買取のみ</option><option value="w">内職のみ</option></select>
     <input type="month" id="l-month">
     <button class="btn tiny" id="l-csv">CSV出力</button>
   </div>
@@ -214,6 +291,20 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
   <h3>サイズ区分</h3>
   <div class="chips" id="c-sizes"></div>
   <div class="row"><div><input id="add-size" placeholder="サイズ名を入力"></div><button class="btn sub" id="add-size-btn">追加</button></div>
+  <h3>メンバー</h3>
+  <div class="chips" id="c-mems"></div>
+  <div class="row"><div><input id="add-mem" placeholder="名前を入力"></div><button class="btn sub" id="add-mem-btn">追加</button></div>
+  <h3>作業の種類</h3>
+  <div class="chips" id="c-tasks"></div>
+  <div class="row"><div><input id="add-task" placeholder="作業名を入力"></div><button class="btn sub" id="add-task-btn">追加</button></div>
+  <h3>内職 作業者</h3>
+  <div class="chips" id="c-workers"></div>
+  <div class="row"><div><input id="add-worker" placeholder="名前を入力"></div><button class="btn sub" id="add-worker-btn">追加</button></div>
+  <h3>鬼皮剥き 単価（円/kg）</h3>
+  <div class="sizes" style="grid-template-columns:1fr 1fr">
+    <div class="sz"><label>良品</label><input type="number" min="0" inputmode="numeric" id="c-peel-good"></div>
+    <div class="sz"><label>傷あり</label><input type="number" min="0" inputmode="numeric" id="c-peel-bad"></div>
+  </div>
   <h3>買取先</h3>
   <div class="chips" id="c-sups"></div>
   <div class="row"><div><input id="add-sup" placeholder="買取先名を入力"></div><button class="btn sub" id="add-sup-btn">追加</button></div>
@@ -224,7 +315,7 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
     <button class="btn sub" id="exp-json">バックアップ（JSON）</button>
     <button class="btn danger" id="clear-all">全データ削除</button>
   </div>
-  <p class="note">データはGoogleスプレッドシート「栗収穫管理」に保存され、3人で同じ内容を共有します。「全データ削除」は記録のみを消し、設定（園地・品種・サイズ・買取先・単価）とシート自体は残ります。</p>
+  <p class="note">データはGoogleスプレッドシート「栗収穫管理」に保存され、3人で同じ内容を共有します。「全データ削除」は記録（収穫・出荷・買取・内職）だけを消し、設定と作業予定・シート自体は残ります。</p>
 </section>
 </main>
 
@@ -235,7 +326,18 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
 /* ===== GAS ウェブアプリのURL（デプロイ後にここへ貼る） ===== */
 const API_URL='PASTE_YOUR_GAS_WEB_APP_URL_HERE';
 
-const DEF={fields:['今中','段宿'],vars:['銀寄','筑波','美栗','丹沢'],sizes:['3L以上','2L','L','M'],sups:['荻野運送','木寺様','余田様','高畑様'],prices:{'3L以上':1700,'2L':1500,'L':1100,'M':700},harvest:[],ship:[],buy:[]};
+const DEF={
+  fields:['今中','段宿'],
+  vars:['銀寄','筑波','美栗','丹沢'],
+  sizes:['3L以上','2L','L','M'],
+  sups:['荻野運送','木寺様','余田様','高畑様'],
+  prices:{'3L以上':1700,'2L':1500,'L':1100,'M':700},
+  mems:['栗原直人','栗原優介','秋山龍之輔','栗原亜美','木村みき','栗原美智代','松本琉雅'],
+  tasks:['栗拾い','選別','出荷','買取受入'],
+  workers:['栗原直人','栗原優介','秋山龍之輔','栗原亜美','木村みき','栗原美智代','松本琉雅'],
+  peelPrice:{good:1500,bad:300},
+  harvest:[],ship:[],buy:[],peel:[],schedule:{}
+};
 let D=JSON.parse(JSON.stringify(DEF));
 const $=id=>document.getElementById(id);
 const today=()=>new Date().toLocaleDateString('sv-SE');
@@ -273,15 +375,23 @@ async function send(action,payload,okMsg){
   catch(e){toast('保存できませんでした。通信を確認してください');return false}
   finally{setBusy(false)}
 }
-function settingsPayload(over){return Object.assign({fields:D.fields,vars:D.vars,sizes:D.sizes,sups:D.sups,prices:D.prices},over||{})}
+function settingsPayload(over){
+  return Object.assign({
+    fields:D.fields,vars:D.vars,sizes:D.sizes,sups:D.sups,
+    mems:D.mems,tasks:D.tasks,workers:D.workers,
+    prices:D.prices,peelPrice:D.peelPrice
+  },over||{});
+}
 function normalize(d){
   const o=Object.assign(JSON.parse(JSON.stringify(DEF)),d||{});
-  ['fields','vars','sizes','sups'].forEach(k=>{if(!Array.isArray(o[k]))o[k]=DEF[k].slice()});
-  if(!o.prices||typeof o.prices!=='object')o.prices={};
+  ['fields','vars','sizes','sups','mems','tasks','workers'].forEach(k=>{if(!Array.isArray(o[k]))o[k]=DEF[k].slice()});
+  ['prices','peelPrice','schedule'].forEach(k=>{if(!o[k]||typeof o[k]!=='object'||Array.isArray(o[k]))o[k]=JSON.parse(JSON.stringify(DEF[k]))});
   ['harvest','ship','buy'].forEach(k=>{
     o[k]=Array.isArray(o[k])?o[k]:[];
     o[k].forEach(r=>{if(!r.q||typeof r.q!=='object')r.q={};if(k==='buy'&&(!r.p||typeof r.p!=='object'))r.p={};if(r.memo==null)r.memo=''});
   });
+  o.peel=Array.isArray(o.peel)?o.peel:[];
+  o.peel.forEach(r=>{if(r.memo==null)r.memo='';['good','bad','gp','bp'].forEach(k=>{if(r[k]==null)r[k]=0})});
   return o;
 }
 async function boot(){
@@ -335,7 +445,7 @@ function buildForms(){
   if(!$('s-date').value)$('s-date').value=today();
   fillSel($('b-sup'),D.sups);$('b-sup').insertAdjacentHTML('beforeend','<option value="__add__">＋ 買取先を追加…</option>');fillSel($('d-sup'),D.sups);
   if(!$('b-date').value)$('b-date').value=today();
-  
+
   buildSizes($('h-sizes'),'h',false);buildSizes($('s-sizes'),'s',true);buildBuySizes();
   $('dest-list').innerHTML=[...new Set(D.ship.map(r=>r.dest))].map(d=>`<option value="${d}">`).join('');
 }
@@ -432,6 +542,109 @@ $('d-make').onclick=()=>{
   $('d-area').hidden=false;$('d-area').scrollIntoView({behavior:'smooth'});
 };
 $('d-print').onclick=()=>window.print();
+
+/* ---- 内職（鬼皮剥き） ---- */
+const peelAmt=r=>Math.round((+r.good||0)*(+r.gp||0)+(+r.bad||0)*(+r.bp||0));
+function calcPeel(){const g=+$('w-good').value||0,b=+$('w-bad').value||0;$('w-total').textContent=fmt(g+b);$('w-amt').textContent=yen(g*(+$('w-good-p').value||0)+b*(+$('w-bad-p').value||0))}
+['w-good','w-bad','w-good-p','w-bad-p'].forEach(id=>$(id).oninput=calcPeel);
+function buildPeelForm(){
+  fillSel($('w-who'),D.workers);$('w-who').insertAdjacentHTML('beforeend','<option value="__add__">＋ 作業者を追加…</option>');
+  fillSel($('wd-who'),D.workers);
+  if(!$('w-date').value)$('w-date').value=today();
+  if(!$('w-good-p').value)$('w-good-p').value=D.peelPrice.good;
+  if(!$('w-bad-p').value)$('w-bad-p').value=D.peelPrice.bad;
+  $('c-peel-good').value=D.peelPrice.good;$('c-peel-bad').value=D.peelPrice.bad;
+  calcPeel();
+}
+$('c-peel-good').onchange=async()=>{
+  const next=Object.assign({},D.peelPrice,{good:+$('c-peel-good').value||0});
+  if(!(await send('saveSettings',settingsPayload({peelPrice:next}),'単価を保存しました')))return;
+  D.peelPrice=next;$('w-good-p').value=D.peelPrice.good;calcPeel();
+};
+$('c-peel-bad').onchange=async()=>{
+  const next=Object.assign({},D.peelPrice,{bad:+$('c-peel-bad').value||0});
+  if(!(await send('saveSettings',settingsPayload({peelPrice:next}),'単価を保存しました')))return;
+  D.peelPrice=next;$('w-bad-p').value=D.peelPrice.bad;calcPeel();
+};
+$('w-who').onchange=()=>{const add=$('w-who').value==='__add__';$('w-newwho').hidden=!add;if(add)$('w-newwho-name').focus();else renderPeelList()};
+$('w-newwho-ok').onclick=async()=>{
+  const v=$('w-newwho-name').value.trim();
+  if(!v)return toast('名前を入力してください');
+  if(D.workers.includes(v))return toast('すでに登録されています');
+  const next=D.workers.concat([v]);
+  if(!(await send('saveSettings',settingsPayload({workers:next}),'追加しました')))return;
+  D.workers=next;$('w-newwho-name').value='';$('w-newwho').hidden=true;renderAll();$('w-who').value=v;renderPeelList();
+};
+$('add-worker-btn').onclick=()=>addItem('workers','add-worker');
+$('w-save').onclick=async()=>{
+  const who=$('w-who').value,g=+$('w-good').value||0,b=+$('w-bad').value||0;
+  if(!$('w-date').value)return toast('日付を入力してください');
+  if(!who||who==='__add__')return toast('作業者を選んでください');
+  if(g+b<=0)return toast('重量を入力してください');
+  const rec={id:uid(),date:$('w-date').value,who,good:g,bad:b,gp:+$('w-good-p').value||0,bp:+$('w-bad-p').value||0,memo:$('w-memo').value.trim()};
+  if(!(await send('add',{kind:'peel',record:rec},'記録しました')))return;
+  D.peel.push(rec);
+  $('w-good').value='';$('w-bad').value='';$('w-memo').value='';calcPeel();renderAll();
+};
+function cardW(r){return `<div class="card"><div class="hd"><b>${r.who}</b><span>${r.date}</span></div>
+ <div class="bd">良品 <b>${fmt(r.good)}</b> kg × ${yen(r.gp)}円　／　傷あり <b>${fmt(r.bad)}</b> kg × ${yen(r.bp)}円　＝ <b>${yen(peelAmt(r))}</b> 円${r.memo?`<br>${r.memo}`:''}</div>
+ <div class="ft"><button class="btn danger" onclick="del('peel','${r.id}')">削除</button></div></div>`}
+function renderPeelList(){
+  const who=$('w-who').value,rows=D.peel.filter(r=>r.who===who).sort((a,b)=>b.date.localeCompare(a.date));
+  const g=rows.reduce((a,r)=>a+r.good,0),b=rows.reduce((a,r)=>a+r.bad,0),amt=rows.reduce((a,r)=>a+peelAmt(r),0);
+  $('w-list').innerHTML=(rows.length?`<div class="total" style="text-align:left">累計 良品 <b>${fmt(g)}</b> kg・傷あり <b>${fmt(b)}</b> kg　／　<b>${yen(amt)}</b> 円（${rows.length}回）</div>`:'')+(rows.length?rows.map(cardW).join(''):'<div class="empty">まだ記録がありません</div>');
+}
+$('wd-make').onclick=()=>{
+  const who=$('wd-who').value,f=$('wd-from').value,t=$('wd-to').value,pay=$('wd-pay').value.trim();
+  const rows=D.peel.filter(r=>r.who===who&&(!f||r.date>=f)&&(!t||r.date<=t)).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!rows.length){$('wd-area').hidden=true;return toast('該当する記録がありません')}
+  let g=0,b=0,total=0;
+  const lines=rows.map(r=>{g+=r.good;b+=r.bad;const a=peelAmt(r);total+=a;return `<tr><td>${r.date.slice(5).replace('-','/')}</td><td>${fmt(r.good)}</td><td>${yen(r.gp)}</td><td>${fmt(r.bad)}</td><td>${yen(r.bp)}</td><td>${yen(a)}</td></tr>`}).join('');
+  $('doc2').innerHTML=`<h1>支払明細書</h1>
+   <div class="meta"><div><div class="to">${who} 様</div><div style="margin-top:6px">作業内容：栗 鬼皮剥き</div><div>対象期間：${jd(rows[0].date)} 〜 ${jd(rows[rows.length-1].date)}（${rows.length}回）</div><div>発行日：${jd(today())}</div>${pay?`<div>お支払日：${pay}</div>`:''}</div>
+   <div class="from"><b>${CO.name}</b><br>${CO.zip} ${CO.addr}<br>${CO.tel}</div></div>
+   <div class="grand">お支払金額　${yen(total)} 円</div>
+   <table><tr><th>日付</th><th>良品(kg)</th><th>単価</th><th>傷あり(kg)</th><th>単価</th><th>金額(円)</th></tr>${lines}
+   <tr><td style="text-align:right"><b>合計</b></td><td><b>${fmt(g)}</b></td><td></td><td><b>${fmt(b)}</b></td><td></td><td><b>${yen(total)}</b></td></tr></table>
+   <div class="foot" style="margin-top:30px;display:flex;justify-content:flex-end;gap:30px"><div>受領日：　　年　　月　　日</div><div>受領印・サイン：＿＿＿＿＿＿＿＿＿</div></div>`;
+  $('wd-area').hidden=false;$('wd-area').scrollIntoView({behavior:'smooth'});
+};
+$('wd-print').onclick=()=>window.print();
+
+/* ---- 作業予定 ---- */
+const shiftDate=(d,n)=>{const x=new Date(d+'T00:00:00');x.setDate(x.getDate()+n);return x.toLocaleDateString('sv-SE')};
+const WD=['日','月','火','水','木','金','土'];
+const wd=d=>WD[new Date(d+'T00:00:00').getDay()];
+function day(d){return D.schedule[d]||(D.schedule[d]={a:{},memo:''})}
+async function saveSchedule(okMsg){
+  return await send('saveSettings',{schedule:D.schedule},okMsg);
+}
+function renderPlan(){
+  if(!$('p-date').value)$('p-date').value=today();
+  const d=$('p-date').value,rec=D.schedule[d]||{a:{},memo:''};
+  $('p-tasks').innerHTML=D.tasks.map(t=>`<div class="task"><div class="tn">${t}</div><div class="mem">${D.mems.map(m=>`<button class="${(rec.a[t]||[]).includes(m)?'on':''}" onclick="togMem('${d}','${t}','${m}')">${m}</button>`).join('')}</div></div>`).join('')||'<div class="empty">設定で作業の種類を追加してください</div>';
+  $('p-memo').value=rec.memo||'';
+  let h='<tr><th>作業</th>'+[...Array(7)].map((_,i)=>{const x=shiftDate(d,i);return `<th class="${x===today()?'today':''}">${x.slice(5).replace('-','/')}<br>(${wd(x)})</th>`}).join('')+'</tr>';
+  D.tasks.forEach(t=>{h+=`<tr><td><b>${t}</b></td>`+[...Array(7)].map((_,i)=>{const x=shiftDate(d,i),r=D.schedule[x],ms=r&&r.a[t]||[];const g=new Date(x+'T00:00:00').getDay();return `<td class="${x===today()?'today':''} ${g===6?'sat':g===0?'sun':''}">${ms.join('<br>')||'<span style="color:#ccc">－</span>'}</td>`}).join('')+'</tr>'});
+  h+='<tr><td>メモ</td>'+[...Array(7)].map((_,i)=>{const x=shiftDate(d,i),r=D.schedule[x];return `<td>${r&&r.memo?r.memo:''}</td>`}).join('')+'</tr>';
+  $('p-week').innerHTML=h;
+}
+async function togMem(d,t,m){
+  const before=JSON.parse(JSON.stringify(D.schedule));
+  const r=day(d);r.a[t]=r.a[t]||[];const i=r.a[t].indexOf(m);i>=0?r.a[t].splice(i,1):r.a[t].push(m);
+  renderPlan();
+  if(!(await saveSchedule())){D.schedule=before;renderPlan()}
+}
+$('p-date').onchange=renderPlan;
+$('p-prev').onclick=()=>{$('p-date').value=shiftDate($('p-date').value,-1);renderPlan()};
+$('p-next').onclick=()=>{$('p-date').value=shiftDate($('p-date').value,1);renderPlan()};
+$('p-memo').onchange=async()=>{
+  const d=$('p-date').value,before=JSON.parse(JSON.stringify(D.schedule));
+  day(d).memo=$('p-memo').value.trim();
+  if(!(await saveSchedule('メモを保存しました'))){D.schedule=before;renderPlan()}
+  else renderPlan();
+};
+
 /* ---- 表示 ---- */
 function cardH(r){return `<div class="card"><div class="hd"><b>${r.field}　${r.var}</b><span>${r.date}</span></div>
  <div class="bd">${D.sizes.map(s=>`${s} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg${r.memo?`<br>${r.memo}`:''}</div>
@@ -475,14 +688,15 @@ function renderList(){
   if(k==='all'||k==='h')rows=rows.concat(D.harvest.map(r=>({...r,k:'h'})));
   if(k==='all'||k==='s')rows=rows.concat(D.ship.map(r=>({...r,k:'s'})));
   if(k==='all'||k==='b')rows=rows.concat(D.buy.map(r=>({...r,k:'b'})));
+  if(k==='all'||k==='w')rows=rows.concat(D.peel.map(r=>({...r,k:'w'})));
   if(m)rows=rows.filter(r=>r.date.startsWith(m));
   rows.sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
-  $('l-body').innerHTML=rows.length?rows.map(r=>r.k==='h'?cardH(r):r.k==='b'?cardB(r):cardS(r)).join(''):'<div class="empty">該当する記録がありません</div>';
+  $('l-body').innerHTML=rows.length?rows.map(r=>r.k==='h'?cardH(r):r.k==='b'?cardB(r):r.k==='w'?cardW(r):cardS(r)).join(''):'<div class="empty">該当する記録がありません</div>';
 }
 $('l-kind').onchange=renderList;$('l-month').onchange=renderList;
 function renderSettings(){
   const chips=(arr,kind)=>arr.map((v,i)=>`<span class="chip">${v}<button title="削除" onclick="rmItem('${kind}',${i})">×</button></span>`).join('')||'<span class="empty">未登録</span>';
-  $('c-fields').innerHTML=chips(D.fields,'fields');$('c-vars').innerHTML=chips(D.vars,'vars');$('c-sizes').innerHTML=chips(D.sizes,'sizes');$('c-sups').innerHTML=chips(D.sups,'sups');
+  $('c-fields').innerHTML=chips(D.fields,'fields');$('c-vars').innerHTML=chips(D.vars,'vars');$('c-sizes').innerHTML=chips(D.sizes,'sizes');$('c-sups').innerHTML=chips(D.sups,'sups');$('c-mems').innerHTML=chips(D.mems,'mems');$('c-workers').innerHTML=chips(D.workers,'workers');$('c-tasks').innerHTML=chips(D.tasks,'tasks');
   $('c-prices').innerHTML=D.sizes.map(s=>`<div class="sz"><label>${s}</label><input type="number" min="0" inputmode="numeric" value="${D.prices[s]||''}" placeholder="円/kg" onchange="savePrice('${s}',this.value)"></div>`).join('');
 }
 function rmItem(kind,i){confirmBox(`「${D[kind][i]}」を一覧から外しますか？（過去の記録は残ります）`,async()=>{
@@ -506,29 +720,32 @@ $('add-field-btn').onclick=()=>addItem('fields','add-field');
 $('add-var-btn').onclick=()=>addItem('vars','add-var');
 $('add-size-btn').onclick=()=>addItem('sizes','add-size');
 $('add-sup-btn').onclick=()=>addItem('sups','add-sup');
+$('add-mem-btn').onclick=()=>addItem('mems','add-mem');
+$('add-task-btn').onclick=()=>addItem('tasks','add-task');
 $('h-date').onchange=renderToday;
 
 /* ---- CSV / JSON ---- */
-function dl(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(["\ufeff"+text],{type}));a.download=name;a.click()}
+function dl(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(["﻿"+text],{type}));a.download=name;a.click()}
 $('l-csv').onclick=()=>{
-  const head=['区分','日付','園地/出荷先/買取先','品種',...D.sizes,'合計kg','単価','金額','メモ'];
+  const head=['区分','日付','園地/出荷先/買取先/作業者','品種',...D.sizes,'合計kg','単価','金額','メモ'];
   const rows=[...D.harvest.map(r=>['収穫',r.date,r.field,r.var,...D.sizes.map(s=>r.q[s]||0),sum(r.q),'','',r.memo||'']),
               ...D.buy.map(r=>['買取',r.date,r.sup,'',...D.sizes.map(s=>r.q[s]||0),sum(r.q),D.sizes.map(s=>`${s}:${r.p[s]||0}`).join(' '),buyAmount(r),r.memo||'']),
-              ...D.ship.map(r=>['出荷',r.date,r.dest,r.var,...D.sizes.map(s=>r.q[s]||0),sum(r.q),r.price||'',r.price?Math.round(sum(r.q)*r.price):'',r.memo||''])];
+              ...D.ship.map(r=>['出荷',r.date,r.dest,r.var,...D.sizes.map(s=>r.q[s]||0),sum(r.q),r.price||'',r.price?Math.round(sum(r.q)*r.price):'',r.memo||'']),
+              ...D.peel.map(r=>['内職',r.date,r.who,'',...D.sizes.map(()=>''),fmt(r.good+r.bad),`良品${r.gp}/傷${r.bp}`,peelAmt(r),`良品${r.good}kg 傷あり${r.bad}kg ${r.memo||''}`])];
   rows.sort((a,b)=>a[1].localeCompare(b[1]));
   dl(`栗収穫管理_${today()}.csv`,[head,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n'),'text/csv');
 };
 $('exp-json').onclick=()=>dl(`kuri-backup_${today()}.json`,JSON.stringify(D,null,1),'application/json');
-$('clear-all').onclick=()=>confirmBox('すべての記録（収穫・出荷・買取）を削除します。元に戻せません。',()=>{
-  const n=D.harvest.length+D.ship.length+D.buy.length;
+$('clear-all').onclick=()=>confirmBox('すべての記録（収穫・出荷・買取・内職）を削除します。元に戻せません。',()=>{
+  const n=D.harvest.length+D.ship.length+D.buy.length+D.peel.length;
   if(!n)return toast('削除する記録がありません');
-  confirmBox(`本当によろしいですか？　記録 ${n} 件をスプレッドシートから削除します。（設定は残ります）`,deleteAllRecords);
+  confirmBox(`本当によろしいですか？　記録 ${n} 件をスプレッドシートから削除します。（設定・作業予定は残ります）`,deleteAllRecords);
 });
 async function deleteAllRecords(){
   if(busy)return;
   if(!apiReady())return toast('API_URL が未設定です');
   const jobs=[];
-  ['harvest','ship','buy'].forEach(k=>D[k].forEach(r=>jobs.push({kind:k,id:r.id})));
+  ['harvest','ship','buy','peel'].forEach(k=>D[k].forEach(r=>jobs.push({kind:k,id:r.id})));
   if(!jobs.length)return toast('削除する記録がありません');
   setBusy(true);
   let ng=0;
@@ -541,7 +758,7 @@ async function deleteAllRecords(){
   toast(ng?'削除できませんでした。通信を確認してください':'削除しました');
 }
 
-function renderAll(){buildForms();renderToday();renderBuyList();renderStock();renderList();renderSettings()}
+function renderAll(){buildForms();buildPeelForm();renderToday();renderBuyList();renderPeelList();renderPlan();renderStock();renderList();renderSettings()}
 renderAll();
 boot();
 </script>

@@ -10,25 +10,36 @@
  *           実行ユーザー「自分」／アクセスできるユーザー「全員」
  *
  * API
- *   GET  ?action=getAll                                  -> {fields,vars,sizes,sups,prices,harvest,ship,buy}
- *   POST {action:'add',        kind:'harvest'|'ship'|'buy', record:{...}}
- *   POST {action:'delete',     kind:'harvest'|'ship'|'buy', id:'...'}
- *   POST {action:'saveSettings', fields:[], vars:[], sizes:[], sups:[], prices:{}}
+ *   GET  ?action=getAll
+ *     -> {fields,vars,sizes,sups,mems,tasks,workers,prices,peelPrice,
+ *         harvest,ship,buy,peel,schedule}
+ *   POST {action:'add',          kind:'harvest'|'ship'|'buy'|'peel', record:{...}}
+ *   POST {action:'delete',       kind:'harvest'|'ship'|'buy'|'peel', id:'...'}
+ *   POST {action:'saveSettings', fields?, vars?, sizes?, sups?, mems?, tasks?,
+ *                                workers?, prices?, peelPrice?, schedule?}
  *
  * 応答はすべて {ok:true, data:...} / {ok:false, error:'...'}
  */
 
 var SPREADSHEET_ID = '';                       // 空ならアクティブなスプレッドシート
 var SETTING_SHEET  = '設定';
-var SHEETS = { harvest: '収穫', ship: '出荷', buy: '買取' };
+var SHEETS = { harvest: '収穫', ship: '出荷', buy: '買取', peel: '内職' };
 
 var DEFAULTS = {
-  fields: ['今中', '段宿'],
-  vars:   ['銀寄', '筑波', '美栗', '丹沢'],
-  sizes:  ['3L以上', '2L', 'L', 'M'],
-  sups:   ['荻野運送', '木寺様', '余田様', '高畑様'],
-  prices: { '3L以上': 1700, '2L': 1500, 'L': 1100, 'M': 700 }
+  fields:    ['今中', '段宿'],
+  vars:      ['銀寄', '筑波', '美栗', '丹沢'],
+  sizes:     ['3L以上', '2L', 'L', 'M'],
+  sups:      ['荻野運送', '木寺様', '余田様', '高畑様'],
+  mems:      ['栗原直人', '栗原優介', '秋山龍之輔', '栗原亜美', '木村みき', '栗原美智代', '松本琉雅'],
+  tasks:     ['栗拾い', '選別', '出荷', '買取受入'],
+  workers:   ['栗原直人', '栗原優介', '秋山龍之輔', '栗原亜美', '木村みき', '栗原美智代', '松本琉雅'],
+  prices:    { '3L以上': 1700, '2L': 1500, 'L': 1100, 'M': 700 },
+  peelPrice: { good: 1500, bad: 300 },
+  schedule:  {}
 };
+
+var ARR_KEYS = ['fields', 'vars', 'sizes', 'sups', 'mems', 'tasks', 'workers'];
+var OBJ_KEYS = ['prices', 'peelPrice', 'schedule'];
 
 /* ===================== エントリポイント ===================== */
 
@@ -66,7 +77,7 @@ function doPost(e) {
 function setup() {
   var ss = ss_();
   var st = readSettings(ss);
-  ['harvest', 'ship', 'buy'].forEach(function (kind) {
+  Object.keys(SHEETS).forEach(function (kind) {
     sheet_(ss, SHEETS[kind], headersFor(kind, st.sizes));
   });
   return 'OK: ' + ss.getName();
@@ -78,14 +89,20 @@ function getAll() {
   var ss = ss_();
   var st = readSettings(ss);
   return {
-    fields:  st.fields,
-    vars:    st.vars,
-    sizes:   st.sizes,
-    sups:    st.sups,
-    prices:  st.prices,
-    harvest: readRecords(ss, 'harvest', st.sizes),
-    ship:    readRecords(ss, 'ship',    st.sizes),
-    buy:     readRecords(ss, 'buy',     st.sizes)
+    fields:    st.fields,
+    vars:      st.vars,
+    sizes:     st.sizes,
+    sups:      st.sups,
+    mems:      st.mems,
+    tasks:     st.tasks,
+    workers:   st.workers,
+    prices:    st.prices,
+    peelPrice: st.peelPrice,
+    schedule:  st.schedule,
+    harvest:   readRecords(ss, 'harvest', st.sizes),
+    ship:      readRecords(ss, 'ship',    st.sizes),
+    buy:       readRecords(ss, 'buy',     st.sizes),
+    peel:      readRecords(ss, 'peel',    st.sizes)
   };
 }
 
@@ -95,8 +112,10 @@ function addRecord(kind, rec) {
 
   var ss = ss_();
   var st = readSettings(ss);
-  // 設定にないサイズがレコードに含まれていても取りこぼさない
-  var sizes = unique(st.sizes.concat(Object.keys(rec.q || {})));
+  // 設定にないサイズがレコードに含まれていても取りこぼさない（peelは無関係）
+  var sizes = (kind === 'peel')
+    ? st.sizes
+    : unique(st.sizes.concat(Object.keys(rec.q || {})));
 
   var sh   = sheet_(ss, SHEETS[kind], headersFor(kind, st.sizes));
   var head = ensureHeaders(sh, headersFor(kind, sizes));
@@ -133,14 +152,14 @@ function deleteRecord(kind, id) {
 function saveSettings(body) {
   var ss  = ss_();
   var cur = readSettings(ss);
-  var st = {
-    fields: Array.isArray(body.fields) ? body.fields.map(String) : cur.fields,
-    vars:   Array.isArray(body.vars)   ? body.vars.map(String)   : cur.vars,
-    sizes:  Array.isArray(body.sizes)  ? body.sizes.map(String)  : cur.sizes,
-    sups:   Array.isArray(body.sups)   ? body.sups.map(String)   : cur.sups,
-    prices: (body.prices && typeof body.prices === 'object' && !Array.isArray(body.prices))
-              ? body.prices : cur.prices
-  };
+  var st = {};
+  ARR_KEYS.forEach(function (k) {
+    st[k] = Array.isArray(body[k]) ? body[k].map(String) : cur[k];
+  });
+  OBJ_KEYS.forEach(function (k) {
+    st[k] = (body[k] && typeof body[k] === 'object' && !Array.isArray(body[k]))
+              ? body[k] : cur[k];
+  });
   writeSettings(sheet_(ss, SETTING_SHEET, ['key', 'value']), st);
   return st;
 }
@@ -154,6 +173,9 @@ function headersFor(kind, sizes) {
   if (kind === 'ship') {
     return ['id', '日付', '出荷先', '品種'].concat(sizes).concat(['合計kg', '単価', 'メモ', '登録日時']);
   }
+  if (kind === 'peel') {
+    return ['id', '日付', '作業者', '良品kg', '良品単価', '傷ありkg', '傷あり単価', '合計kg', '金額', 'メモ', '登録日時'];
+  }
   return ['id', '日付', '買取先']
     .concat(sizes.map(function (s) { return s + '_kg'; }))
     .concat(sizes.map(function (s) { return s + '_単価'; }))
@@ -161,12 +183,25 @@ function headersFor(kind, sizes) {
 }
 
 function buildRowMap(kind, rec, sizes) {
-  var q = rec.q || {}, m = {}, total = 0;
-
+  var m = {};
   m['id']       = String(rec.id);
   m['日付']     = String(rec.date || '');
   m['メモ']     = String(rec.memo || '');
   m['登録日時'] = Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd HH:mm:ss');
+
+  if (kind === 'peel') {
+    var g = num(rec.good), b = num(rec.bad), gp = num(rec.gp), bp = num(rec.bp);
+    m['作業者']     = String(rec.who || '');
+    m['良品kg']     = g;
+    m['良品単価']   = gp;
+    m['傷ありkg']   = b;
+    m['傷あり単価'] = bp;
+    m['合計kg']     = Math.round((g + b) * 10) / 10;
+    m['金額']       = Math.round(g * gp + b * bp);
+    return m;
+  }
+
+  var q = rec.q || {}, total = 0;
 
   if (kind === 'buy') {
     var p = rec.p || {}, amt = 0;
@@ -213,8 +248,18 @@ function readRecords(ss, kind, sizes) {
     if (!id) continue;
 
     var rec = { id: id, date: dstr(col(row, '日付')), memo: String(col(row, 'メモ') || '') };
-    var q = {};
 
+    if (kind === 'peel') {
+      rec.who  = String(col(row, '作業者') || '');
+      rec.good = num(col(row, '良品kg'));
+      rec.bad  = num(col(row, '傷ありkg'));
+      rec.gp   = num(col(row, '良品単価'));
+      rec.bp   = num(col(row, '傷あり単価'));
+      out.push(rec);
+      continue;
+    }
+
+    var q = {};
     if (kind === 'buy') {
       var p = {};
       sizes.forEach(function (s) { q[s] = num(col(row, s + '_kg')); p[s] = num(col(row, s + '_単価')); });
@@ -249,24 +294,22 @@ function readSettings(ss) {
   }
 
   var st = {};
-  ['fields', 'vars', 'sizes', 'sups'].forEach(function (k) {
+  ARR_KEYS.forEach(function (k) {
     st[k] = Array.isArray(raw[k]) ? raw[k].map(String) : DEFAULTS[k].slice();
   });
-  st.prices = (raw.prices && typeof raw.prices === 'object' && !Array.isArray(raw.prices))
-                ? raw.prices : copy(DEFAULTS.prices);
+  OBJ_KEYS.forEach(function (k) {
+    st[k] = (raw[k] && typeof raw[k] === 'object' && !Array.isArray(raw[k]))
+              ? raw[k] : copy(DEFAULTS[k]);
+  });
 
   if (vals.length < 2) writeSettings(sh, st);   // 初回は既定値を書き込む
   return st;
 }
 
 function writeSettings(sh, st) {
-  var rows = [
-    ['fields', JSON.stringify(st.fields)],
-    ['vars',   JSON.stringify(st.vars)],
-    ['sizes',  JSON.stringify(st.sizes)],
-    ['sups',   JSON.stringify(st.sups)],
-    ['prices', JSON.stringify(st.prices)]
-  ];
+  var rows = ARR_KEYS.concat(OBJ_KEYS).map(function (k) {
+    return [k, JSON.stringify(st[k])];
+  });
   var last = sh.getLastRow();
   if (last > 1) sh.getRange(2, 1, last - 1, Math.max(sh.getLastColumn(), 2)).clearContent();
   sh.getRange(2, 1, rows.length, 2).setValues(rows);

@@ -168,7 +168,7 @@ function saveSettings(body) {
 
 function headersFor(kind, sizes) {
   if (kind === 'harvest') {
-    return ['id', '日付', '園地', '品種'].concat(sizes).concat(['合計kg', 'メモ', '登録日時']);
+    return ['id', '日付', '園地', '品種'].concat(sizes).concat(['廃棄kg', '合計kg', 'メモ', '登録日時']);
   }
   if (kind === 'ship') {
     return ['id', '日付', '出荷先', '品種'].concat(sizes).concat(['合計kg', '単価', 'メモ', '登録日時']);
@@ -217,7 +217,8 @@ function buildRowMap(kind, rec, sizes) {
     sizes.forEach(function (s) { var w = num(q[s]); m[s] = w; total += w; });
     m['品種'] = String(rec['var'] || '');
     if (kind === 'harvest') {
-      m['園地'] = String(rec.field || '');
+      m['園地']   = String(rec.field || '');
+      m['廃棄kg'] = num(rec.waste);   // 廃棄は在庫・出荷可能量には含めない
     } else {
       m['出荷先'] = String(rec.dest || '');
       m['単価'] = (rec.price === null || rec.price === undefined || rec.price === '') ? '' : num(rec.price);
@@ -271,6 +272,7 @@ function readRecords(ss, kind, sizes) {
       rec['var'] = String(col(row, '品種') || '');
       if (kind === 'harvest') {
         rec.field = String(col(row, '園地') || '');
+        rec.waste = num(col(row, '廃棄kg'));
       } else {
         rec.dest = String(col(row, '出荷先') || '');
         var pv = col(row, '単価');

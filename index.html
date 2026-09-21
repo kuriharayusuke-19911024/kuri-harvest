@@ -61,7 +61,7 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
 .note{font-size:12px;color:var(--sub);background:var(--soft);padding:8px 10px;border-radius:8px;margin-top:16px}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
 #toast.show{opacity:1}
-#modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:20px}
+#modal{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:20px}
 #modal .box{background:#fff;border-radius:12px;padding:20px;max-width:320px;width:100%}
 #modal p{margin:0 0 16px}
 #modal .acts{display:flex;gap:8px;justify-content:flex-end}
@@ -71,34 +71,32 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
 .print-only{display:none}
 @media print{
   body *{visibility:hidden}
-  #doc,#doc *,#doc2,#doc2 *{visibility:visible}
-  #doc,#doc2{position:absolute;left:0;top:0;width:100%;padding:20mm 15mm}
+  #doc,#doc *{visibility:visible}
+  #docmodal{position:static;background:none;padding:0;overflow:visible}
+  #docmodal .dm-box{max-width:none;padding:0;border-radius:0;box-shadow:none}
+  #docmodal .dm-bar{display:none}
+  #docmodal .docwrap{border:0;border-radius:0;padding:0;margin:0;overflow:visible}
+  #doc{position:absolute;left:0;top:0;width:100%;padding:20mm 15mm}
 }
 #doc{font-size:13px;color:#000}
-#doc2{font-size:13px;color:#000}
 #doc h1{font-size:22px;text-align:center;letter-spacing:.3em;margin:0 0 20px;border-bottom:2px solid #000;padding-bottom:6px}
-#doc2 h1{font-size:22px;text-align:center;letter-spacing:.3em;margin:0 0 20px;border-bottom:2px solid #000;padding-bottom:6px}
 #doc .meta{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
-#doc2 .meta{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
 #doc .to{font-size:17px;border-bottom:1px solid #000;padding-bottom:4px}
-#doc2 .to{font-size:17px;border-bottom:1px solid #000;padding-bottom:4px}
 #doc .from{font-size:12px;line-height:1.6;text-align:right}
-#doc2 .from{font-size:12px;line-height:1.6;text-align:right}
 #doc table{border-collapse:collapse;width:100%;margin:10px 0;font-size:13px}
-#doc2 table{border-collapse:collapse;width:100%;margin:10px 0;font-size:13px}
 #doc th,#doc td{border:1px solid #000;padding:6px 8px;text-align:right;white-space:nowrap;color:#000}
-#doc2 th,#doc2 td{border:1px solid #000;padding:6px 8px;text-align:right;white-space:nowrap;color:#000}
 #doc th{background:#eee;font-weight:700;text-align:center;font-size:12px}
-#doc2 th{background:#eee;font-weight:700;text-align:center;font-size:12px}
 #doc td:nth-child(1),#doc td:nth-child(2),#doc td:nth-child(3){text-align:left}
-#doc2 td:nth-child(1),#doc2 td:nth-child(2),#doc2 td:nth-child(3){text-align:left}
 #doc .grand{font-size:18px;font-weight:700;text-align:right;margin:10px 0}
-#doc2 .grand{font-size:18px;font-weight:700;text-align:right;margin:10px 0}
 #doc .grand small{font-size:12px;font-weight:400;margin-left:12px}
-#doc2 .grand small{font-size:12px;font-weight:400;margin-left:12px}
 #doc .foot{font-size:12px;color:#333;margin-top:14px}
-#doc2 .foot{font-size:12px;color:#333;margin-top:14px}
 .docwrap{border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:12px;background:#fff}
+#docmodal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);padding:16px;overflow:auto}
+#docmodal .dm-box{background:#fff;border-radius:12px;padding:12px;max-width:760px;margin:0 auto}
+#docmodal .dm-bar{display:flex;gap:8px;align-items:center}
+#docmodal .dm-bar .sp{flex:1}
+#docmodal .dm-x{border:0;background:none;font-size:24px;line-height:1;color:var(--sub);cursor:pointer;padding:0 8px;width:auto}
+#docmodal .docwrap{margin-top:10px;overflow-x:auto}
 
 .mem{display:flex;flex-wrap:wrap;gap:6px}
 .mem button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font-size:14px;color:var(--sub);cursor:pointer}
@@ -193,11 +191,6 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
   </div>
   <button class="btn sub" id="d-make">明細書を作成</button>
   <p class="note">期間は空欄なら全期間（最初から最後まで）で作成します。</p>
-
-  <div id="d-area" hidden>
-    <div class="row"><button class="btn sub" id="d-print">印刷 / PDF保存</button></div>
-    <div class="docwrap"><div id="doc"></div></div>
-  </div>
 </section>
 
 <!-- 内職（鬼皮剥き） -->
@@ -228,10 +221,6 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
   </div>
   <button class="btn sub" id="wd-make">明細書を作成</button>
   <p class="note">期間は空欄なら全期間で作成します。</p>
-  <div id="wd-area" hidden>
-    <div class="row"><button class="btn sub" id="wd-print">印刷 / PDF保存</button></div>
-    <div class="docwrap"><div id="doc2"></div></div>
-  </div>
 </section>
 
 <!-- 予定 -->
@@ -253,11 +242,12 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
 <!-- 在庫 -->
 <section id="tab-stock" hidden>
   <h2>現在の在庫</h2>
-  <div class="sum" style="grid-template-columns:repeat(4,1fr)">
+  <div class="sum" style="grid-template-columns:repeat(auto-fit,minmax(100px,1fr))">
     <div><small>収穫累計</small><b id="st-h">0<i>kg</i></b></div>
     <div><small>買取累計</small><b id="st-b">0<i>kg</i></b></div>
     <div><small>出荷累計</small><b id="st-s">0<i>kg</i></b></div>
     <div><small>在庫</small><b id="st-z">0<i>kg</i></b></div>
+    <div><small>廃棄累計</small><b id="st-w">0<i>kg</i></b></div>
   </div>
   <div class="tw"><table id="st-table"></table></div>
   <h3>園地別 収穫量</h3>
@@ -322,6 +312,20 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
 <div id="toast"></div>
 <div id="modal" hidden><div class="box"><p id="modal-msg"></p><div class="acts"><button class="btn tiny" id="modal-no">キャンセル</button><button class="btn danger" id="modal-ok">削除する</button></div></div></div>
 
+<!-- 書類（納品書・買取明細書・支払明細書）共通モーダル -->
+<div id="docmodal" hidden>
+  <div class="dm-box">
+    <div class="dm-bar">
+      <button class="btn sub" id="dm-print">印刷</button>
+      <button class="btn sub" id="dm-pdf">PDF保存</button>
+      <span class="sp"></span>
+      <button class="dm-x" id="dm-close" title="閉じる">×</button>
+    </div>
+    <div class="docwrap"><div id="doc"></div></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
 /* ===== GAS ウェブアプリのURL（デプロイ後にここへ貼る） ===== */
 const API_URL='https://script.google.com/macros/s/AKfycbzn4p0SPn5KqQAJLlRnM8Ao9bK688OrH-plEOqFUDoxbWAoa3IPnsD_4vyuTmVyUOBMvA/exec';
@@ -388,7 +392,7 @@ function normalize(d){
   ['prices','peelPrice','schedule'].forEach(k=>{if(!o[k]||typeof o[k]!=='object'||Array.isArray(o[k]))o[k]=JSON.parse(JSON.stringify(DEF[k]))});
   ['harvest','ship','buy'].forEach(k=>{
     o[k]=Array.isArray(o[k])?o[k]:[];
-    o[k].forEach(r=>{if(!r.q||typeof r.q!=='object')r.q={};if(k==='buy'&&(!r.p||typeof r.p!=='object'))r.p={};if(r.memo==null)r.memo=''});
+    o[k].forEach(r=>{if(!r.q||typeof r.q!=='object')r.q={};if(k==='buy'&&(!r.p||typeof r.p!=='object'))r.p={};if(r.memo==null)r.memo='';if(k==='harvest')r.waste=+r.waste||0});
   });
   o.peel=Array.isArray(o.peel)?o.peel:[];
   o.peel.forEach(r=>{if(r.memo==null)r.memo='';['good','bad','gp','bp'].forEach(k=>{if(r[k]==null)r[k]=0})});
@@ -446,8 +450,13 @@ function buildForms(){
   fillSel($('b-sup'),D.sups);$('b-sup').insertAdjacentHTML('beforeend','<option value="__add__">＋ 買取先を追加…</option>');fillSel($('d-sup'),D.sups);
   if(!$('b-date').value)$('b-date').value=today();
 
-  buildSizes($('h-sizes'),'h',false);buildSizes($('s-sizes'),'s',true);buildBuySizes();
+  buildSizes($('h-sizes'),'h',false);buildWaste();buildSizes($('s-sizes'),'s',true);buildBuySizes();
   $('dest-list').innerHTML=[...new Set(D.ship.map(r=>r.dest))].map(d=>`<option value="${d}">`).join('');
+}
+function buildWaste(){
+  const cur=$('h-waste')?$('h-waste').value:'';
+  $('h-sizes').insertAdjacentHTML('beforeend','<div class="sz"><label>廃棄（kg）</label><input type="number" step="0.1" min="0" inputmode="decimal" id="h-waste" placeholder="0"></div>');
+  if(cur)$('h-waste').value=cur;
 }
 $('s-var').onchange=()=>buildSizes($('s-sizes'),'s',true);
 
@@ -457,10 +466,10 @@ $('h-save').onclick=async()=>{
   if(!$('h-date').value)return toast('日付を入力してください');
   if(!$('h-field').value)return toast('園地を設定で追加してください');
   if(sum(q)<=0)return toast('収量を入力してください');
-  const rec={id:uid(),date:$('h-date').value,field:$('h-field').value,var:$('h-var').value,q,memo:$('h-memo').value.trim()};
+  const rec={id:uid(),date:$('h-date').value,field:$('h-field').value,var:$('h-var').value,q,waste:+$('h-waste').value||0,memo:$('h-memo').value.trim()};
   if(!(await send('add',{kind:'harvest',record:rec},'収穫を記録しました')))return;
   D.harvest.push(rec);
-  document.querySelectorAll('[data-p="h"]').forEach(i=>i.value='');$('h-memo').value='';calcTotal('h');
+  document.querySelectorAll('[data-p="h"]').forEach(i=>i.value='');$('h-waste').value='';$('h-memo').value='';calcTotal('h');
   renderAll();
 };
 /* ---- 出荷保存 ---- */
@@ -475,7 +484,7 @@ $('s-save').onclick=async()=>{
     if(!(await send('add',{kind:'ship',record:rec},'出荷を記録しました')))return;
     D.ship.push(rec);
     document.querySelectorAll('[data-p="s"]').forEach(i=>i.value='');$('s-memo').value='';$('s-price').value='';
-    renderAll();
+    renderAll();showShipDoc(rec.id);
   };
   if(over.length){$('modal-ok').textContent='記録する';confirmBox(`${over.join('・')}が在庫を超えています。それでも記録しますか？`,()=>{doSave();$('modal-ok').textContent='削除する'})}
   else doSave();
@@ -502,6 +511,30 @@ $('b-save').onclick=async()=>{
   document.querySelectorAll('[data-p="b"]').forEach(i=>i.value='');$('b-memo').value='';calcBuy();
   renderAll();showDelivery(rec.id);
 };
+/* ---- 書類モーダル（納品書・買取明細書・支払明細書 共通） ---- */
+let docName='書類';
+function showDoc(html,name){
+  docName=(name||'書類').replace(/[\\/:*?"<>|]/g,'_');
+  $('doc').innerHTML=html;
+  const m=$('docmodal');m.hidden=false;m.scrollTop=0;
+}
+function closeDoc(){$('docmodal').hidden=true}
+$('dm-close').onclick=closeDoc;
+$('docmodal').onclick=e=>{if(e.target===$('docmodal'))closeDoc()};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('docmodal').hidden)closeDoc()});
+$('dm-print').onclick=()=>window.print();
+$('dm-pdf').onclick=()=>{
+  if(typeof html2pdf!=='function')return toast('PDF機能を読み込めませんでした。通信を確認してください');
+  toast('PDFを作成中…');
+  html2pdf().set({
+    margin:[15,12,15,12],
+    filename:docName+'.pdf',
+    image:{type:'jpeg',quality:.98},
+    html2canvas:{scale:2,backgroundColor:'#ffffff',useCORS:true},
+    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+  }).from($('doc')).save().then(()=>toast('PDFを保存しました')).catch(()=>toast('PDFを保存できませんでした'));
+};
+
 /* ---- 書類共通 ---- */
 function docHead(title,sup,lines2){return `<h1>${title}</h1>
    <div class="meta"><div><div class="to">${sup}</div>${lines2}</div>
@@ -521,27 +554,43 @@ function showDelivery(id){
   const t=docTable([r],false);
   const cum=D.buy.filter(x=>x.sup===r.sup&&(x.date<r.date||(x.date===r.date&&x.id<=r.id)));
   const ckg=cum.reduce((a,x)=>a+sum(x.q),0),camt=cum.reduce((a,x)=>a+buyAmount(x),0);
-  $('doc').innerHTML=docHead('納品書',r.sup,`<div style="margin-top:6px">納品日：${jd(r.date)}</div><div>発行日：${jd(today())}</div>`)+
+  showDoc(docHead('納品書',r.sup,`<div style="margin-top:6px">納品日：${jd(r.date)}</div><div>発行日：${jd(today())}</div>`)+
    `<p>下記のとおり受領いたしました。</p>${t.html}
     <div class="grand">今回分　${yen(t.total)} 円</div>
     <table style="width:auto;margin-left:auto"><tr><th>今シーズン累計（${cum.length}回）</th><th>重量(kg)</th><th>金額(円)</th></tr>
     <tr><td>${jd(cum[0].date)} 〜 ${jd(r.date)}</td><td>${fmt(ckg)}</td><td>${yen(camt)}</td></tr></table>
-    <div class="foot">※単価・金額は税込（軽減税率8%対象）です。お支払は期間終了後に買取明細書にてご案内します。${r.memo?'<br>'+r.memo:''}</div>`;
-  $('d-area').hidden=false;$('d-area').scrollIntoView({behavior:'smooth'});
+    <div class="foot">※単価・金額は税込（軽減税率8%対象）です。お支払は期間終了後に買取明細書にてご案内します。${r.memo?'<br>'+r.memo:''}</div>`,
+   `納品書_${r.sup}_${r.date}`);
+}
+
+/* ---- 出荷の納品書 ---- */
+const honor=n=>/(様|御中|殿)\s*$/.test(n)?n:n+' 御中';
+function showShipDoc(id){
+  const r=D.ship.find(x=>x.id===id);if(!r)return;
+  const pr=+r.price||0,kg=sum(r.q);
+  let lines='';
+  D.sizes.forEach(s=>{const w=+r.q[s]||0;if(!w)return;
+    lines+=`<tr><td>${s}</td><td>${fmt(w)}</td>${pr?`<td>${yen(pr)}</td><td>${yen(w*pr)}</td>`:''}</tr>`});
+  showDoc(docHead('納品書',honor(r.dest),`<div style="margin-top:6px">納品日：${jd(r.date)}</div><div>発行日：${jd(today())}</div><div>品種：${r.var}</div>`)+
+   `<p>下記のとおり納品いたしました。</p>
+    <table><tr><th>サイズ</th><th>重量(kg)</th>${pr?'<th>単価(円/kg)</th><th>金額(円)</th>':''}</tr>${lines}
+    <tr><td style="text-align:right"><b>合計</b></td><td><b>${fmt(kg)}</b></td>${pr?`<td></td><td><b>${yen(kg*pr)}</b></td>`:''}</tr></table>
+    ${pr?`<div class="grand">合計金額　${yen(kg*pr)} 円<small>（内消費税等 8%：${yen(Math.floor(kg*pr*8/108))} 円）</small></div>`:`<div class="grand">合計　${fmt(kg)} kg</div>`}
+    <div class="foot">${pr?'※単価・金額は税込（軽減税率8%対象）です。':'※単価は別途ご連絡いたします。'}${r.memo?'<br>'+r.memo:''}</div>`,
+   `納品書_${r.dest}_${r.date}`);
 }
 /* ---- 買取明細書（期間まとめ） ---- */
 $('d-make').onclick=()=>{
   const sup=$('d-sup').value,f=$('d-from').value,tEnd=$('d-to').value,pay=$('d-pay').value.trim();
   const rows=D.buy.filter(r=>r.sup===sup&&(!f||r.date>=f)&&(!tEnd||r.date<=tEnd)).sort((a,b)=>a.date.localeCompare(b.date));
-  if(!rows.length){$('d-area').hidden=true;return toast('該当する買取記録がありません')}
+  if(!rows.length)return toast('該当する買取記録がありません');
   const t=docTable(rows,true),tax=Math.floor(t.total*8/108);
-  $('doc').innerHTML=docHead('買取明細書',sup,`<div style="margin-top:6px">対象期間：${jd(rows[0].date)} 〜 ${jd(rows[rows.length-1].date)}（${rows.length}回）</div><div>発行日：${jd(today())}</div>${pay?`<div>お支払予定：${pay}</div>`:''}`)+
+  showDoc(docHead('買取明細書',sup,`<div style="margin-top:6px">対象期間：${jd(rows[0].date)} 〜 ${jd(rows[rows.length-1].date)}（${rows.length}回）</div><div>発行日：${jd(today())}</div>${pay?`<div>お支払予定：${pay}</div>`:''}`)+
    `<p>下記のとおり買取いたしましたので、お支払内容をご通知申し上げます。</p>
     <div class="grand">お支払金額　${yen(t.total)} 円<small>（内消費税等 8%：${yen(tax)} 円）</small></div>${t.html}
-    <div class="foot">※単価・金額は税込（軽減税率8%対象）です。</div>`;
-  $('d-area').hidden=false;$('d-area').scrollIntoView({behavior:'smooth'});
+    <div class="foot">※単価・金額は税込（軽減税率8%対象）です。</div>`,
+   `買取明細書_${sup}_${today()}`);
 };
-$('d-print').onclick=()=>window.print();
 
 /* ---- 内職（鬼皮剥き） ---- */
 const peelAmt=r=>Math.round((+r.good||0)*(+r.gp||0)+(+r.bad||0)*(+r.bp||0));
@@ -597,19 +646,18 @@ function renderPeelList(){
 $('wd-make').onclick=()=>{
   const who=$('wd-who').value,f=$('wd-from').value,t=$('wd-to').value,pay=$('wd-pay').value.trim();
   const rows=D.peel.filter(r=>r.who===who&&(!f||r.date>=f)&&(!t||r.date<=t)).sort((a,b)=>a.date.localeCompare(b.date));
-  if(!rows.length){$('wd-area').hidden=true;return toast('該当する記録がありません')}
+  if(!rows.length)return toast('該当する記録がありません');
   let g=0,b=0,total=0;
   const lines=rows.map(r=>{g+=r.good;b+=r.bad;const a=peelAmt(r);total+=a;return `<tr><td>${r.date.slice(5).replace('-','/')}</td><td>${fmt(r.good)}</td><td>${yen(r.gp)}</td><td>${fmt(r.bad)}</td><td>${yen(r.bp)}</td><td>${yen(a)}</td></tr>`}).join('');
-  $('doc2').innerHTML=`<h1>支払明細書</h1>
+  showDoc(`<h1>支払明細書</h1>
    <div class="meta"><div><div class="to">${who} 様</div><div style="margin-top:6px">作業内容：栗 鬼皮剥き</div><div>対象期間：${jd(rows[0].date)} 〜 ${jd(rows[rows.length-1].date)}（${rows.length}回）</div><div>発行日：${jd(today())}</div>${pay?`<div>お支払日：${pay}</div>`:''}</div>
    <div class="from"><b>${CO.name}</b><br>${CO.zip} ${CO.addr}<br>${CO.tel}</div></div>
    <div class="grand">お支払金額　${yen(total)} 円</div>
    <table><tr><th>日付</th><th>良品(kg)</th><th>単価</th><th>傷あり(kg)</th><th>単価</th><th>金額(円)</th></tr>${lines}
    <tr><td style="text-align:right"><b>合計</b></td><td><b>${fmt(g)}</b></td><td></td><td><b>${fmt(b)}</b></td><td></td><td><b>${yen(total)}</b></td></tr></table>
-   <div class="foot" style="margin-top:30px;display:flex;justify-content:flex-end;gap:30px"><div>受領日：　　年　　月　　日</div><div>受領印・サイン：＿＿＿＿＿＿＿＿＿</div></div>`;
-  $('wd-area').hidden=false;$('wd-area').scrollIntoView({behavior:'smooth'});
+   <div class="foot" style="margin-top:30px;display:flex;justify-content:flex-end;gap:30px"><div>受領日：　　年　　月　　日</div><div>受領印・サイン：＿＿＿＿＿＿＿＿＿</div></div>`,
+   `支払明細書_${who}_${today()}`);
 };
-$('wd-print').onclick=()=>window.print();
 
 /* ---- 作業予定 ---- */
 const shiftDate=(d,n)=>{const x=new Date(d+'T00:00:00');x.setDate(x.getDate()+n);return x.toLocaleDateString('sv-SE')};
@@ -647,11 +695,11 @@ $('p-memo').onchange=async()=>{
 
 /* ---- 表示 ---- */
 function cardH(r){return `<div class="card"><div class="hd"><b>${r.field}　${r.var}</b><span>${r.date}</span></div>
- <div class="bd">${D.sizes.map(s=>`${s} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg${r.memo?`<br>${r.memo}`:''}</div>
+ <div class="bd">${D.sizes.map(s=>`${s} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg${+r.waste?`　／ 廃棄 <b>${fmt(r.waste)}</b> kg`:''}${r.memo?`<br>${r.memo}`:''}</div>
  <div class="ft"><button class="btn danger" onclick="del('harvest','${r.id}')">削除</button></div></div>`}
 function cardS(r){return `<div class="card"><div class="hd"><b>→ ${r.dest}　${r.var}</b><span>${r.date}</span></div>
  <div class="bd">${D.sizes.map(s=>`${s} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg${r.price?`　@${r.price}円`:''}${r.memo?`<br>${r.memo}`:''}</div>
- <div class="ft"><button class="btn danger" onclick="del('ship','${r.id}')">削除</button></div></div>`}
+ <div class="ft"><button class="btn tiny" onclick="showShipDoc('${r.id}')">納品書</button>　<button class="btn danger" onclick="del('ship','${r.id}')">削除</button></div></div>`}
 function cardB(r){return `<div class="card"><div class="hd"><b>買取 ← ${r.sup}</b><span>${r.date}</span></div>
  <div class="bd">${D.sizes.map(s=>`${s} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg　<b>${yen(buyAmount(r))}</b> 円${r.memo?`<br>${r.memo}`:''}</div>
  <div class="ft"><button class="btn tiny" onclick="showDelivery('${r.id}')">納品書</button>　<button class="btn danger" onclick="del('buy','${r.id}')">削除</button></div></div>`}
@@ -675,10 +723,12 @@ function renderStock(){
   Object.keys(z).forEach(v=>{
     let vt=0;html+=`<tr><td><b>${v}</b></td>`+D.sizes.map(s=>{const c=z[v][s]||{h:0,s:0},n=c.h-c.s;vt+=n;th+=c.h-(c.b||0);tb+=c.b||0;ts+=c.s;return `<td class="${n<0?'neg':''}">${fmt(n)}</td>`}).join('')+`<td><b>${fmt(vt)}</b></td></tr>`;
   });
-  $('st-table').innerHTML=html;$('st-h').innerHTML=fmt(th)+'<i>kg</i>';$('st-s').innerHTML=fmt(ts)+'<i>kg</i>';$('st-b').innerHTML=fmt(tb)+'<i>kg</i>';$('st-z').innerHTML=fmt(th+tb-ts)+'<i>kg</i>';
+  const tw=D.harvest.reduce((a,r)=>a+(+r.waste||0),0);
+  $('st-table').innerHTML=html;$('st-h').innerHTML=fmt(th)+'<i>kg</i>';$('st-s').innerHTML=fmt(ts)+'<i>kg</i>';$('st-b').innerHTML=fmt(tb)+'<i>kg</i>';$('st-z').innerHTML=fmt(th+tb-ts)+'<i>kg</i>';$('st-w').innerHTML=fmt(tw)+'<i>kg</i>';
   const grp=(arr,key)=>{const g={};arr.forEach(r=>{g[r[key]]=g[r[key]]||{n:0,q:{}};g[r[key]].n+=sum(r.q);D.sizes.forEach(s=>g[r[key]].q[s]=(g[r[key]].q[s]||0)+(+r.q[s]||0))});return g};
-  const tbl=(g,label)=>{const ks=Object.keys(g);if(!ks.length)return `<tr><td class="empty">記録なし</td></tr>`;return `<tr><th>${label}</th>${D.sizes.map(s=>`<th>${s}</th>`).join('')}<th>合計</th></tr>`+ks.sort((a,b)=>g[b].n-g[a].n).map(k=>`<tr><td>${k}</td>${D.sizes.map(s=>`<td>${fmt(g[k].q[s]||0)}</td>`).join('')}<td><b>${fmt(g[k].n)}</b></td></tr>`).join('')};
-  $('st-field').innerHTML=tbl(grp(D.harvest,'field'),'園地');
+  const tbl=(g,label,w)=>{const ks=Object.keys(g);if(!ks.length)return `<tr><td class="empty">記録なし</td></tr>`;return `<tr><th>${label}</th>${D.sizes.map(s=>`<th>${s}</th>`).join('')}<th>合計</th>${w?'<th>廃棄</th>':''}</tr>`+ks.sort((a,b)=>g[b].n-g[a].n).map(k=>`<tr><td>${k}</td>${D.sizes.map(s=>`<td>${fmt(g[k].q[s]||0)}</td>`).join('')}<td><b>${fmt(g[k].n)}</b></td>${w?`<td>${fmt(w[k]||0)}</td>`:''}</tr>`).join('')};
+  const fw={};D.harvest.forEach(r=>{fw[r.field]=(fw[r.field]||0)+(+r.waste||0)});
+  $('st-field').innerHTML=tbl(grp(D.harvest,'field'),'園地',fw);
   $('st-sup').innerHTML=tbl(grp(D.buy,'sup'),'買取先');
   $('st-dest').innerHTML=tbl(grp(D.ship,'dest'),'出荷先');
 }
@@ -727,11 +777,11 @@ $('h-date').onchange=renderToday;
 /* ---- CSV / JSON ---- */
 function dl(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(["﻿"+text],{type}));a.download=name;a.click()}
 $('l-csv').onclick=()=>{
-  const head=['区分','日付','園地/出荷先/買取先/作業者','品種',...D.sizes,'合計kg','単価','金額','メモ'];
-  const rows=[...D.harvest.map(r=>['収穫',r.date,r.field,r.var,...D.sizes.map(s=>r.q[s]||0),sum(r.q),'','',r.memo||'']),
-              ...D.buy.map(r=>['買取',r.date,r.sup,'',...D.sizes.map(s=>r.q[s]||0),sum(r.q),D.sizes.map(s=>`${s}:${r.p[s]||0}`).join(' '),buyAmount(r),r.memo||'']),
-              ...D.ship.map(r=>['出荷',r.date,r.dest,r.var,...D.sizes.map(s=>r.q[s]||0),sum(r.q),r.price||'',r.price?Math.round(sum(r.q)*r.price):'',r.memo||'']),
-              ...D.peel.map(r=>['内職',r.date,r.who,'',...D.sizes.map(()=>''),fmt(r.good+r.bad),`良品${r.gp}/傷${r.bp}`,peelAmt(r),`良品${r.good}kg 傷あり${r.bad}kg ${r.memo||''}`])];
+  const head=['区分','日付','園地/出荷先/買取先/作業者','品種',...D.sizes,'合計kg','廃棄kg','単価','金額','メモ'];
+  const rows=[...D.harvest.map(r=>['収穫',r.date,r.field,r.var,...D.sizes.map(s=>r.q[s]||0),sum(r.q),+r.waste||0,'','',r.memo||'']),
+              ...D.buy.map(r=>['買取',r.date,r.sup,'',...D.sizes.map(s=>r.q[s]||0),sum(r.q),'',D.sizes.map(s=>`${s}:${r.p[s]||0}`).join(' '),buyAmount(r),r.memo||'']),
+              ...D.ship.map(r=>['出荷',r.date,r.dest,r.var,...D.sizes.map(s=>r.q[s]||0),sum(r.q),'',r.price||'',r.price?Math.round(sum(r.q)*r.price):'',r.memo||'']),
+              ...D.peel.map(r=>['内職',r.date,r.who,'',...D.sizes.map(()=>''),fmt(r.good+r.bad),'',`良品${r.gp}/傷${r.bp}`,peelAmt(r),`良品${r.good}kg 傷あり${r.bad}kg ${r.memo||''}`])];
   rows.sort((a,b)=>a[1].localeCompare(b[1]));
   dl(`栗収穫管理_${today()}.csv`,[head,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n'),'text/csv');
 };

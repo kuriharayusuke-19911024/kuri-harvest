@@ -546,16 +546,19 @@ const jd=d=>{const [y,m,dd]=d.split('-');return `${y}年${+m}月${+dd}日`};
 /* ---- 納品書（都度） ---- */
 function showDelivery(id){
   const r=D.buy.find(x=>x.id===id);if(!r)return;
-  const t=docTable([r],false);
+  const kg=sum(r.q);
+  const lines=D.sizes.map(s=>{const w=+r.q[s]||0;return w?`<tr><td>${s}</td><td>${fmt(w)}</td></tr>`:''}).join('');
   const cum=D.buy.filter(x=>x.sup===r.sup&&(x.date<r.date||(x.date===r.date&&x.id<=r.id)));
-  const ckg=cum.reduce((a,x)=>a+sum(x.q),0),camt=cum.reduce((a,x)=>a+buyAmount(x),0);
+  const ckg=cum.reduce((a,x)=>a+sum(x.q),0);
   showDoc(docHead('納品書',r.sup,`<div style="margin-top:6px">納品日：${jd(r.date)}</div><div>発行日：${jd(today())}</div>`)+
-   `<p>下記のとおり受領いたしました。</p>${t.html}
-    <div class="grand">今回分　${yen(t.total)} 円</div>
-    <table style="width:auto;margin-left:auto"><tr><th>今シーズン累計（${cum.length}回）</th><th>重量(kg)</th><th>金額(円)</th></tr>
-    <tr><td>${jd(cum[0].date)} 〜 ${jd(r.date)}</td><td>${fmt(ckg)}</td><td>${yen(camt)}</td></tr></table>
+   `<p>下記のとおり受領いたしました。</p>
+    <table><tr><th>サイズ</th><th>重量(kg)</th></tr>${lines}
+    <tr><td style="text-align:right"><b>合計</b></td><td><b>${fmt(kg)}</b></td></tr></table>
     ${wasteBox(r.waste)}
-    <div class="foot">※単価・金額は税込（軽減税率8%対象）です。お支払は期間終了後に買取明細書にてご案内します。${r.memo?'<br>'+r.memo:''}</div>`,
+    <div class="grand">合計　${fmt(kg)} kg</div>
+    <table style="width:auto;margin-left:auto"><tr><th>今シーズン累計（${cum.length}回）</th><th>重量(kg)</th></tr>
+    <tr><td>${jd(cum[0].date)} 〜 ${jd(r.date)}</td><td>${fmt(ckg)}</td></tr></table>
+    <div class="foot">※お支払金額は期間終了後の買取明細書にてご案内します。${r.memo?'<br>'+r.memo:''}</div>`,
    `納品書_${r.sup}_${r.date}`);
 }
 

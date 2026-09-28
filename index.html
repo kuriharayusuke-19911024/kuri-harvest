@@ -134,7 +134,6 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
   <div class="row">
     <div><label>日付</label><input type="date" id="h-date"></div>
     <div><label>園地（田んぼ・畑）</label><select id="h-field"></select></div>
-    <div><label>品種</label><select id="h-var"></select></div>
   </div>
   <label>サイズ別 収量（kg）</label>
   <div class="sizes" id="h-sizes"></div>
@@ -152,7 +151,6 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
   <div class="row">
     <div><label>日付</label><input type="date" id="s-date"></div>
     <div><label>出荷先</label><input id="s-dest" list="dest-list" placeholder="例：但馬米穀"><datalist id="dest-list"></datalist></div>
-    <div><label>品種</label><select id="s-var"></select></div>
   </div>
   <label>サイズ別 出荷量（kg）　※（ ）内は現在庫</label>
   <div class="sizes" id="s-sizes"></div>
@@ -247,7 +245,7 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
     <div><small>買取累計</small><b id="st-b">0<i>kg</i></b></div>
     <div><small>出荷累計</small><b id="st-s">0<i>kg</i></b></div>
     <div><small>在庫</small><b id="st-z">0<i>kg</i></b></div>
-    <div><small>廃棄累計</small><b id="st-w">0<i>kg</i></b></div>
+    <div><small>廃棄累計</small><b id="st-w" style="font-size:15px">自社 0<i>kg</i>／買取 0<i>kg</i></b></div>
   </div>
   <div class="tw"><table id="st-table"></table></div>
   <h3>園地別 収穫量</h3>
@@ -275,9 +273,6 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
   <h3>園地（田んぼ・畑）</h3>
   <div class="chips" id="c-fields"></div>
   <div class="row"><div><input id="add-field" placeholder="園地名を入力"></div><button class="btn sub" id="add-field-btn">追加</button></div>
-  <h3>品種</h3>
-  <div class="chips" id="c-vars"></div>
-  <div class="row"><div><input id="add-var" placeholder="品種名を入力"></div><button class="btn sub" id="add-var-btn">追加</button></div>
   <h3>サイズ区分</h3>
   <div class="chips" id="c-sizes"></div>
   <div class="row"><div><input id="add-size" placeholder="サイズ名を入力"></div><button class="btn sub" id="add-size-btn">追加</button></div>
@@ -332,7 +327,6 @@ const API_URL='https://script.google.com/macros/s/AKfycbzn4p0SPn5KqQAJLlRnM8Ao9b
 
 const DEF={
   fields:['今中','段宿'],
-  vars:['銀寄','筑波','美栗','丹沢'],
   sizes:['3L以上','2L','L','M'],
   sups:['荻野運送','木寺様','余田様','高畑様'],
   prices:{'3L以上':1700,'2L':1500,'L':1100,'M':700},
@@ -381,18 +375,18 @@ async function send(action,payload,okMsg){
 }
 function settingsPayload(over){
   return Object.assign({
-    fields:D.fields,vars:D.vars,sizes:D.sizes,sups:D.sups,
+    fields:D.fields,sizes:D.sizes,sups:D.sups,
     mems:D.mems,tasks:D.tasks,workers:D.workers,
     prices:D.prices,peelPrice:D.peelPrice
   },over||{});
 }
 function normalize(d){
   const o=Object.assign(JSON.parse(JSON.stringify(DEF)),d||{});
-  ['fields','vars','sizes','sups','mems','tasks','workers'].forEach(k=>{if(!Array.isArray(o[k]))o[k]=DEF[k].slice()});
+  ['fields','sizes','sups','mems','tasks','workers'].forEach(k=>{if(!Array.isArray(o[k]))o[k]=DEF[k].slice()});
   ['prices','peelPrice','schedule'].forEach(k=>{if(!o[k]||typeof o[k]!=='object'||Array.isArray(o[k]))o[k]=JSON.parse(JSON.stringify(DEF[k]))});
   ['harvest','ship','buy'].forEach(k=>{
     o[k]=Array.isArray(o[k])?o[k]:[];
-    o[k].forEach(r=>{if(!r.q||typeof r.q!=='object')r.q={};if(k==='buy'&&(!r.p||typeof r.p!=='object'))r.p={};if(r.memo==null)r.memo='';if(k==='harvest')r.waste=+r.waste||0});
+    o[k].forEach(r=>{if(!r.q||typeof r.q!=='object')r.q={};if(k==='buy'&&(!r.p||typeof r.p!=='object'))r.p={};if(r.memo==null)r.memo='';if(k!=='ship')r.waste=+r.waste||0});
   });
   o.peel=Array.isArray(o.peel)?o.peel:[];
   o.peel.forEach(r=>{if(r.memo==null)r.memo='';['good','bad','gp','bp'].forEach(k=>{if(r[k]==null)r[k]=0})});
@@ -415,27 +409,28 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
 
 /* ---- 在庫計算 ---- */
 function stock(){
-  const z={};D.vars.forEach(v=>{z[v]={};D.sizes.forEach(s=>z[v][s]={h:0,s:0})});
-  D.harvest.forEach(r=>{if(!z[r.var])z[r.var]={};D.sizes.forEach(s=>{z[r.var][s]=z[r.var][s]||{h:0,s:0};z[r.var][s].h+=+r.q[s]||0})});
-  if(D.buy.length){z['買取分']={};D.sizes.forEach(s=>z['買取分'][s]={h:0,s:0,b:0})}
-  D.buy.forEach(r=>{D.sizes.forEach(s=>{const c=z['買取分'][s];c.h+=+r.q[s]||0;c.b+=+r.q[s]||0})});
-  D.ship.forEach(r=>{if(!z[r.var])z[r.var]={};D.sizes.forEach(s=>{z[r.var][s]=z[r.var][s]||{h:0,s:0};z[r.var][s].s+=+r.q[s]||0})});
+  const z={};D.sizes.forEach(s=>z[s]={h:0,b:0,s:0});
+  const add=(arr,k)=>arr.forEach(r=>D.sizes.forEach(s=>{z[s][k]+=+r.q[s]||0}));
+  add(D.harvest,'h');add(D.buy,'b');add(D.ship,'s');   // 廃棄は含めない
   return z;
 }
 
 /* ---- フォーム構築 ---- */
 function fillSel(el,arr){const cur=el.value;el.innerHTML=arr.map(v=>`<option>${v}</option>`).join('');if(arr.includes(cur))el.value=cur}
 function buildSizes(cont,prefix,withStock){
-  const z=withStock?stock():null,v=$('s-var').value;
+  const z=withStock?stock():null;
   cont.innerHTML=D.sizes.map(s=>{
-    const st=z&&z[v]&&z[v][s]?fmt(z[v][s].h-z[v][s].s):'';
+    const st=z?fmt(z[s].h+z[s].b-z[s].s):'';
     return `<div class="sz"><label>${s}${withStock?`<br><span style="font-weight:400;color:#7a6a5a">(${st})</span>`:''}</label><input type="number" step="0.1" min="0" inputmode="decimal" data-size="${s}" data-p="${prefix}" placeholder="0"></div>`;
   }).join('');
   cont.querySelectorAll('input').forEach(i=>i.oninput=()=>calcTotal(prefix));
   calcTotal(prefix);
 }
 function buildBuySizes(){
-  $('b-sizes').innerHTML=D.sizes.map(s=>`<div class="sz"><label>${s}</label><input type="number" step="0.1" min="0" inputmode="decimal" data-size="${s}" data-p="b" placeholder="kg"><input type="number" min="0" inputmode="numeric" data-size="${s}" data-pp="b" value="${D.prices[s]||''}" placeholder="円/kg" style="margin-top:4px;font-size:14px"></div>`).join('');
+  const cur=$('b-waste')?$('b-waste').value:'';
+  $('b-sizes').innerHTML=D.sizes.map(s=>`<div class="sz"><label>${s}</label><input type="number" step="0.1" min="0" inputmode="decimal" data-size="${s}" data-p="b" placeholder="kg"><input type="number" min="0" inputmode="numeric" data-size="${s}" data-pp="b" value="${D.prices[s]||''}" placeholder="円/kg" style="margin-top:4px;font-size:14px"></div>`).join('')+
+    '<div class="sz"><label>廃棄（kg）</label><input type="number" step="0.1" min="0" inputmode="decimal" id="b-waste" placeholder="0"></div>';
+  if(cur)$('b-waste').value=cur;
   $('b-sizes').querySelectorAll('input').forEach(i=>i.oninput=calcBuy);calcBuy();
 }
 function readPrices(){const p={};document.querySelectorAll('[data-pp="b"]').forEach(i=>{p[i.dataset.size]=+i.value||0});return p}
@@ -444,7 +439,7 @@ function buyAmount(r){return D.sizes.reduce((a,s)=>a+(+r.q[s]||0)*(+r.p[s]||0),0
 function readSizes(prefix){const q={};document.querySelectorAll(`[data-p="${prefix}"]`).forEach(i=>{q[i.dataset.size]=+i.value||0});return q}
 function calcTotal(p){$(p+'-total').textContent=fmt(sum(readSizes(p)))}
 function buildForms(){
-  fillSel($('h-field'),D.fields);fillSel($('h-var'),D.vars);fillSel($('s-var'),D.vars);
+  fillSel($('h-field'),D.fields);
   if(!$('h-date').value)$('h-date').value=today();
   if(!$('s-date').value)$('s-date').value=today();
   fillSel($('b-sup'),D.sups);$('b-sup').insertAdjacentHTML('beforeend','<option value="__add__">＋ 買取先を追加…</option>');fillSel($('d-sup'),D.sups);
@@ -458,7 +453,6 @@ function buildWaste(){
   $('h-sizes').insertAdjacentHTML('beforeend','<div class="sz"><label>廃棄（kg）</label><input type="number" step="0.1" min="0" inputmode="decimal" id="h-waste" placeholder="0"></div>');
   if(cur)$('h-waste').value=cur;
 }
-$('s-var').onchange=()=>buildSizes($('s-sizes'),'s',true);
 
 /* ---- 収穫保存 ---- */
 $('h-save').onclick=async()=>{
@@ -466,7 +460,7 @@ $('h-save').onclick=async()=>{
   if(!$('h-date').value)return toast('日付を入力してください');
   if(!$('h-field').value)return toast('園地を設定で追加してください');
   if(sum(q)<=0)return toast('収量を入力してください');
-  const rec={id:uid(),date:$('h-date').value,field:$('h-field').value,var:$('h-var').value,q,waste:+$('h-waste').value||0,memo:$('h-memo').value.trim()};
+  const rec={id:uid(),date:$('h-date').value,field:$('h-field').value,q,waste:+$('h-waste').value||0,memo:$('h-memo').value.trim()};
   if(!(await send('add',{kind:'harvest',record:rec},'収穫を記録しました')))return;
   D.harvest.push(rec);
   document.querySelectorAll('[data-p="h"]').forEach(i=>i.value='');$('h-waste').value='';$('h-memo').value='';calcTotal('h');
@@ -474,13 +468,13 @@ $('h-save').onclick=async()=>{
 };
 /* ---- 出荷保存 ---- */
 $('s-save').onclick=async()=>{
-  const q=readSizes('s'),dest=$('s-dest').value.trim(),v=$('s-var').value;
+  const q=readSizes('s'),dest=$('s-dest').value.trim();
   if(!$('s-date').value)return toast('日付を入力してください');
   if(!dest)return toast('出荷先を入力してください');
   if(sum(q)<=0)return toast('出荷量を入力してください');
-  const z=stock();const over=D.sizes.filter(s=>z[v]&&z[v][s]&&(z[v][s].h-z[v][s].s)<q[s]);
+  const z=stock();const over=D.sizes.filter(s=>(z[s].h+z[s].b-z[s].s)<q[s]);
   const doSave=async()=>{
-    const rec={id:uid(),date:$('s-date').value,dest,var:v,q,price:+$('s-price').value||null,memo:$('s-memo').value.trim()};
+    const rec={id:uid(),date:$('s-date').value,dest,q,price:+$('s-price').value||null,memo:$('s-memo').value.trim()};
     if(!(await send('add',{kind:'ship',record:rec},'出荷を記録しました')))return;
     D.ship.push(rec);
     document.querySelectorAll('[data-p="s"]').forEach(i=>i.value='');$('s-memo').value='';$('s-price').value='';
@@ -505,10 +499,10 @@ $('b-save').onclick=async()=>{
   if(!$('b-date').value)return toast('日付を入力してください');
   if(!$('b-sup').value||$('b-sup').value==='__add__')return toast('買取先を選んでください');
   if(sum(q)<=0)return toast('重量を入力してください');
-  const rec={id:uid(),date:$('b-date').value,sup:$('b-sup').value,q,p,memo:$('b-memo').value.trim()};
+  const rec={id:uid(),date:$('b-date').value,sup:$('b-sup').value,q,p,waste:+$('b-waste').value||0,memo:$('b-memo').value.trim()};
   if(!(await send('add',{kind:'buy',record:rec},'買取を記録しました')))return;
   D.buy.push(rec);
-  document.querySelectorAll('[data-p="b"]').forEach(i=>i.value='');$('b-memo').value='';calcBuy();
+  document.querySelectorAll('[data-p="b"]').forEach(i=>i.value='');$('b-waste').value='';$('b-memo').value='';calcBuy();
   renderAll();showDelivery(rec.id);
 };
 /* ---- 書類モーダル（納品書・買取明細書・支払明細書 共通） ---- */
@@ -547,6 +541,7 @@ function docTable(rows,withDate){
    <tr><td colspan="${withDate?2:1}" style="text-align:right"><b>合計</b></td><td><b>${fmt(kg)}</b></td><td></td><td><b>${yen(total)}</b></td></tr></table>`;
   return {html,total,kg};
 }
+const wasteBox=w=>+w?`<div style="display:inline-block;border:1px solid #000;padding:6px 12px;margin:4px 0">廃棄　${fmt(w)} kg（支払対象外）</div>`:'';
 const jd=d=>{const [y,m,dd]=d.split('-');return `${y}年${+m}月${+dd}日`};
 /* ---- 納品書（都度） ---- */
 function showDelivery(id){
@@ -559,6 +554,7 @@ function showDelivery(id){
     <div class="grand">今回分　${yen(t.total)} 円</div>
     <table style="width:auto;margin-left:auto"><tr><th>今シーズン累計（${cum.length}回）</th><th>重量(kg)</th><th>金額(円)</th></tr>
     <tr><td>${jd(cum[0].date)} 〜 ${jd(r.date)}</td><td>${fmt(ckg)}</td><td>${yen(camt)}</td></tr></table>
+    ${wasteBox(r.waste)}
     <div class="foot">※単価・金額は税込（軽減税率8%対象）です。お支払は期間終了後に買取明細書にてご案内します。${r.memo?'<br>'+r.memo:''}</div>`,
    `納品書_${r.sup}_${r.date}`);
 }
@@ -571,7 +567,7 @@ function showShipDoc(id){
   let lines='';
   D.sizes.forEach(s=>{const w=+r.q[s]||0;if(!w)return;
     lines+=`<tr><td>${s}</td><td>${fmt(w)}</td>${pr?`<td>${yen(pr)}</td><td>${yen(w*pr)}</td>`:''}</tr>`});
-  showDoc(docHead('納品書',honor(r.dest),`<div style="margin-top:6px">納品日：${jd(r.date)}</div><div>発行日：${jd(today())}</div><div>品種：${r.var}</div>`)+
+  showDoc(docHead('納品書',honor(r.dest),`<div style="margin-top:6px">納品日：${jd(r.date)}</div><div>発行日：${jd(today())}</div>`)+
    `<p>下記のとおり納品いたしました。</p>
     <table><tr><th>サイズ</th><th>重量(kg)</th>${pr?'<th>単価(円/kg)</th><th>金額(円)</th>':''}</tr>${lines}
     <tr><td style="text-align:right"><b>合計</b></td><td><b>${fmt(kg)}</b></td>${pr?`<td></td><td><b>${yen(kg*pr)}</b></td>`:''}</tr></table>
@@ -584,10 +580,10 @@ $('d-make').onclick=()=>{
   const sup=$('d-sup').value,f=$('d-from').value,tEnd=$('d-to').value,pay=$('d-pay').value.trim();
   const rows=D.buy.filter(r=>r.sup===sup&&(!f||r.date>=f)&&(!tEnd||r.date<=tEnd)).sort((a,b)=>a.date.localeCompare(b.date));
   if(!rows.length)return toast('該当する買取記録がありません');
-  const t=docTable(rows,true),tax=Math.floor(t.total*8/108);
+  const t=docTable(rows,true),tax=Math.floor(t.total*8/108),tw=rows.reduce((a,r)=>a+(+r.waste||0),0);
   showDoc(docHead('買取明細書',sup,`<div style="margin-top:6px">対象期間：${jd(rows[0].date)} 〜 ${jd(rows[rows.length-1].date)}（${rows.length}回）</div><div>発行日：${jd(today())}</div>${pay?`<div>お支払予定：${pay}</div>`:''}`)+
    `<p>下記のとおり買取いたしましたので、お支払内容をご通知申し上げます。</p>
-    <div class="grand">お支払金額　${yen(t.total)} 円<small>（内消費税等 8%：${yen(tax)} 円）</small></div>${t.html}
+    <div class="grand">お支払金額　${yen(t.total)} 円<small>（内消費税等 8%：${yen(tax)} 円）</small></div>${t.html}${wasteBox(tw)}
     <div class="foot">※単価・金額は税込（軽減税率8%対象）です。</div>`,
    `買取明細書_${sup}_${today()}`);
 };
@@ -694,14 +690,14 @@ $('p-memo').onchange=async()=>{
 };
 
 /* ---- 表示 ---- */
-function cardH(r){return `<div class="card"><div class="hd"><b>${r.field}　${r.var}</b><span>${r.date}</span></div>
+function cardH(r){return `<div class="card"><div class="hd"><b>${r.field}</b><span>${r.date}</span></div>
  <div class="bd">${D.sizes.map(s=>`${s} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg${+r.waste?`　／ 廃棄 <b>${fmt(r.waste)}</b> kg`:''}${r.memo?`<br>${r.memo}`:''}</div>
  <div class="ft"><button class="btn danger" onclick="del('harvest','${r.id}')">削除</button></div></div>`}
-function cardS(r){return `<div class="card"><div class="hd"><b>→ ${r.dest}　${r.var}</b><span>${r.date}</span></div>
+function cardS(r){return `<div class="card"><div class="hd"><b>→ ${r.dest}</b><span>${r.date}</span></div>
  <div class="bd">${D.sizes.map(s=>`${s} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg${r.price?`　@${r.price}円`:''}${r.memo?`<br>${r.memo}`:''}</div>
  <div class="ft"><button class="btn tiny" onclick="showShipDoc('${r.id}')">納品書</button>　<button class="btn danger" onclick="del('ship','${r.id}')">削除</button></div></div>`}
 function cardB(r){return `<div class="card"><div class="hd"><b>買取 ← ${r.sup}</b><span>${r.date}</span></div>
- <div class="bd">${D.sizes.map(s=>`${s} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg　<b>${yen(buyAmount(r))}</b> 円${r.memo?`<br>${r.memo}`:''}</div>
+ <div class="bd">${D.sizes.map(s=>`${s} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg　<b>${yen(buyAmount(r))}</b> 円${+r.waste?`　／ 廃棄 <b>${fmt(r.waste)}</b> kg（支払対象外）`:''}${r.memo?`<br>${r.memo}`:''}</div>
  <div class="ft"><button class="btn tiny" onclick="showDelivery('${r.id}')">納品書</button>　<button class="btn danger" onclick="del('buy','${r.id}')">削除</button></div></div>`}
 function del(kind,id){confirmBox('この記録を削除しますか？',async()=>{
   if(!(await send('delete',{kind,id},'削除しました')))return;
@@ -719,17 +715,18 @@ function renderBuyList(){
 }
 function renderStock(){
   const z=stock();let th=0,ts=0,tb=0;
-  let html=`<tr><th>品種 / サイズ</th>${D.sizes.map(s=>`<th>${s}</th>`).join('')}<th>合計</th></tr>`;
-  Object.keys(z).forEach(v=>{
-    let vt=0;html+=`<tr><td><b>${v}</b></td>`+D.sizes.map(s=>{const c=z[v][s]||{h:0,s:0},n=c.h-c.s;vt+=n;th+=c.h-(c.b||0);tb+=c.b||0;ts+=c.s;return `<td class="${n<0?'neg':''}">${fmt(n)}</td>`}).join('')+`<td><b>${fmt(vt)}</b></td></tr>`;
-  });
-  const tw=D.harvest.reduce((a,r)=>a+(+r.waste||0),0);
-  $('st-table').innerHTML=html;$('st-h').innerHTML=fmt(th)+'<i>kg</i>';$('st-s').innerHTML=fmt(ts)+'<i>kg</i>';$('st-b').innerHTML=fmt(tb)+'<i>kg</i>';$('st-z').innerHTML=fmt(th+tb-ts)+'<i>kg</i>';$('st-w').innerHTML=fmt(tw)+'<i>kg</i>';
+  D.sizes.forEach(s=>{th+=z[s].h;tb+=z[s].b;ts+=z[s].s});
+  const row=(label,f)=>{let t=0;return `<tr><td><b>${label}</b></td>`+D.sizes.map(s=>{const n=f(z[s]);t+=n;return `<td class="${n<0?'neg':''}">${fmt(n)}</td>`}).join('')+`<td><b>${fmt(t)}</b></td></tr>`};
+  let html=`<tr><th>サイズ</th>${D.sizes.map(s=>`<th>${s}</th>`).join('')}<th>合計</th></tr>`+row('自社分',c=>c.h-c.s);
+  if(D.buy.length)html+=row('買取分',c=>c.b)+row('在庫合計',c=>c.h+c.b-c.s);
+  const tw=D.harvest.reduce((a,r)=>a+(+r.waste||0),0),tbw=D.buy.reduce((a,r)=>a+(+r.waste||0),0);
+  $('st-table').innerHTML=html;$('st-h').innerHTML=fmt(th)+'<i>kg</i>';$('st-s').innerHTML=fmt(ts)+'<i>kg</i>';$('st-b').innerHTML=fmt(tb)+'<i>kg</i>';$('st-z').innerHTML=fmt(th+tb-ts)+'<i>kg</i>';$('st-w').innerHTML=`自社 ${fmt(tw)}<i>kg</i>／買取 ${fmt(tbw)}<i>kg</i>`;
   const grp=(arr,key)=>{const g={};arr.forEach(r=>{g[r[key]]=g[r[key]]||{n:0,q:{}};g[r[key]].n+=sum(r.q);D.sizes.forEach(s=>g[r[key]].q[s]=(g[r[key]].q[s]||0)+(+r.q[s]||0))});return g};
   const tbl=(g,label,w)=>{const ks=Object.keys(g);if(!ks.length)return `<tr><td class="empty">記録なし</td></tr>`;return `<tr><th>${label}</th>${D.sizes.map(s=>`<th>${s}</th>`).join('')}<th>合計</th>${w?'<th>廃棄</th>':''}</tr>`+ks.sort((a,b)=>g[b].n-g[a].n).map(k=>`<tr><td>${k}</td>${D.sizes.map(s=>`<td>${fmt(g[k].q[s]||0)}</td>`).join('')}<td><b>${fmt(g[k].n)}</b></td>${w?`<td>${fmt(w[k]||0)}</td>`:''}</tr>`).join('')};
   const fw={};D.harvest.forEach(r=>{fw[r.field]=(fw[r.field]||0)+(+r.waste||0)});
   $('st-field').innerHTML=tbl(grp(D.harvest,'field'),'園地',fw);
-  $('st-sup').innerHTML=tbl(grp(D.buy,'sup'),'買取先');
+  const sw={};D.buy.forEach(r=>{sw[r.sup]=(sw[r.sup]||0)+(+r.waste||0)});
+  $('st-sup').innerHTML=tbl(grp(D.buy,'sup'),'買取先',sw);
   $('st-dest').innerHTML=tbl(grp(D.ship,'dest'),'出荷先');
 }
 function renderList(){
@@ -746,7 +743,7 @@ function renderList(){
 $('l-kind').onchange=renderList;$('l-month').onchange=renderList;
 function renderSettings(){
   const chips=(arr,kind)=>arr.map((v,i)=>`<span class="chip">${v}<button title="削除" onclick="rmItem('${kind}',${i})">×</button></span>`).join('')||'<span class="empty">未登録</span>';
-  $('c-fields').innerHTML=chips(D.fields,'fields');$('c-vars').innerHTML=chips(D.vars,'vars');$('c-sizes').innerHTML=chips(D.sizes,'sizes');$('c-sups').innerHTML=chips(D.sups,'sups');$('c-mems').innerHTML=chips(D.mems,'mems');$('c-workers').innerHTML=chips(D.workers,'workers');$('c-tasks').innerHTML=chips(D.tasks,'tasks');
+  $('c-fields').innerHTML=chips(D.fields,'fields');$('c-sizes').innerHTML=chips(D.sizes,'sizes');$('c-sups').innerHTML=chips(D.sups,'sups');$('c-mems').innerHTML=chips(D.mems,'mems');$('c-workers').innerHTML=chips(D.workers,'workers');$('c-tasks').innerHTML=chips(D.tasks,'tasks');
   $('c-prices').innerHTML=D.sizes.map(s=>`<div class="sz"><label>${s}</label><input type="number" min="0" inputmode="numeric" value="${D.prices[s]||''}" placeholder="円/kg" onchange="savePrice('${s}',this.value)"></div>`).join('');
 }
 function rmItem(kind,i){confirmBox(`「${D[kind][i]}」を一覧から外しますか？（過去の記録は残ります）`,async()=>{
@@ -767,7 +764,6 @@ async function savePrice(s,val){
   D.prices=next;buildBuySizes();
 }
 $('add-field-btn').onclick=()=>addItem('fields','add-field');
-$('add-var-btn').onclick=()=>addItem('vars','add-var');
 $('add-size-btn').onclick=()=>addItem('sizes','add-size');
 $('add-sup-btn').onclick=()=>addItem('sups','add-sup');
 $('add-mem-btn').onclick=()=>addItem('mems','add-mem');
@@ -777,11 +773,11 @@ $('h-date').onchange=renderToday;
 /* ---- CSV / JSON ---- */
 function dl(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(["﻿"+text],{type}));a.download=name;a.click()}
 $('l-csv').onclick=()=>{
-  const head=['区分','日付','園地/出荷先/買取先/作業者','品種',...D.sizes,'合計kg','廃棄kg','単価','金額','メモ'];
-  const rows=[...D.harvest.map(r=>['収穫',r.date,r.field,r.var,...D.sizes.map(s=>r.q[s]||0),sum(r.q),+r.waste||0,'','',r.memo||'']),
-              ...D.buy.map(r=>['買取',r.date,r.sup,'',...D.sizes.map(s=>r.q[s]||0),sum(r.q),'',D.sizes.map(s=>`${s}:${r.p[s]||0}`).join(' '),buyAmount(r),r.memo||'']),
-              ...D.ship.map(r=>['出荷',r.date,r.dest,r.var,...D.sizes.map(s=>r.q[s]||0),sum(r.q),'',r.price||'',r.price?Math.round(sum(r.q)*r.price):'',r.memo||'']),
-              ...D.peel.map(r=>['内職',r.date,r.who,'',...D.sizes.map(()=>''),fmt(r.good+r.bad),'',`良品${r.gp}/傷${r.bp}`,peelAmt(r),`良品${r.good}kg 傷あり${r.bad}kg ${r.memo||''}`])];
+  const head=['区分','日付','園地/出荷先/買取先/作業者',...D.sizes,'合計kg','廃棄kg','単価','金額','メモ'];
+  const rows=[...D.harvest.map(r=>['収穫',r.date,r.field,...D.sizes.map(s=>r.q[s]||0),sum(r.q),+r.waste||0,'','',r.memo||'']),
+              ...D.buy.map(r=>['買取',r.date,r.sup,...D.sizes.map(s=>r.q[s]||0),sum(r.q),+r.waste||0,D.sizes.map(s=>`${s}:${r.p[s]||0}`).join(' '),buyAmount(r),r.memo||'']),
+              ...D.ship.map(r=>['出荷',r.date,r.dest,...D.sizes.map(s=>r.q[s]||0),sum(r.q),'',r.price||'',r.price?Math.round(sum(r.q)*r.price):'',r.memo||'']),
+              ...D.peel.map(r=>['内職',r.date,r.who,...D.sizes.map(()=>''),fmt(r.good+r.bad),'',`良品${r.gp}/傷${r.bp}`,peelAmt(r),`良品${r.good}kg 傷あり${r.bad}kg ${r.memo||''}`])];
   rows.sort((a,b)=>a[1].localeCompare(b[1]));
   dl(`栗収穫管理_${today()}.csv`,[head,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n'),'text/csv');
 };

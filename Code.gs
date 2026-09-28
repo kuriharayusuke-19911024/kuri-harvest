@@ -11,11 +11,11 @@
  *
  * API
  *   GET  ?action=getAll
- *     -> {fields,vars,sizes,sups,mems,tasks,workers,prices,peelPrice,
+ *     -> {fields,sizes,sups,mems,tasks,workers,prices,peelPrice,
  *         harvest,ship,buy,peel,schedule}
  *   POST {action:'add',          kind:'harvest'|'ship'|'buy'|'peel', record:{...}}
  *   POST {action:'delete',       kind:'harvest'|'ship'|'buy'|'peel', id:'...'}
- *   POST {action:'saveSettings', fields?, vars?, sizes?, sups?, mems?, tasks?,
+ *   POST {action:'saveSettings', fields?, sizes?, sups?, mems?, tasks?,
  *                                workers?, prices?, peelPrice?, schedule?}
  *
  * 応答はすべて {ok:true, data:...} / {ok:false, error:'...'}
@@ -27,7 +27,6 @@ var SHEETS = { harvest: '収穫', ship: '出荷', buy: '買取', peel: '内職' 
 
 var DEFAULTS = {
   fields:    ['今中', '段宿'],
-  vars:      ['銀寄', '筑波', '美栗', '丹沢'],
   sizes:     ['3L以上', '2L', 'L', 'M'],
   sups:      ['荻野運送', '木寺様', '余田様', '高畑様'],
   mems:      ['栗原直人', '栗原優介', '秋山龍之輔', '栗原亜美', '木村みき', '栗原美智代', '松本琉雅'],
@@ -38,7 +37,7 @@ var DEFAULTS = {
   schedule:  {}
 };
 
-var ARR_KEYS = ['fields', 'vars', 'sizes', 'sups', 'mems', 'tasks', 'workers'];
+var ARR_KEYS = ['fields', 'sizes', 'sups', 'mems', 'tasks', 'workers'];
 var OBJ_KEYS = ['prices', 'peelPrice', 'schedule'];
 
 /* ===================== エントリポイント ===================== */
@@ -90,7 +89,6 @@ function getAll() {
   var st = readSettings(ss);
   return {
     fields:    st.fields,
-    vars:      st.vars,
     sizes:     st.sizes,
     sups:      st.sups,
     mems:      st.mems,
@@ -168,10 +166,10 @@ function saveSettings(body) {
 
 function headersFor(kind, sizes) {
   if (kind === 'harvest') {
-    return ['id', '日付', '園地', '品種'].concat(sizes).concat(['廃棄kg', '合計kg', 'メモ', '登録日時']);
+    return ['id', '日付', '園地'].concat(sizes).concat(['廃棄kg', '合計kg', 'メモ', '登録日時']);
   }
   if (kind === 'ship') {
-    return ['id', '日付', '出荷先', '品種'].concat(sizes).concat(['合計kg', '単価', 'メモ', '登録日時']);
+    return ['id', '日付', '出荷先'].concat(sizes).concat(['合計kg', '単価', 'メモ', '登録日時']);
   }
   if (kind === 'peel') {
     return ['id', '日付', '作業者', '良品kg', '良品単価', '傷ありkg', '傷あり単価', '合計kg', '金額', 'メモ', '登録日時'];
@@ -179,7 +177,7 @@ function headersFor(kind, sizes) {
   return ['id', '日付', '買取先']
     .concat(sizes.map(function (s) { return s + '_kg'; }))
     .concat(sizes.map(function (s) { return s + '_単価'; }))
-    .concat(['合計kg', '金額', 'メモ', '登録日時']);
+    .concat(['廃棄kg', '合計kg', '金額', 'メモ', '登録日時']);
 }
 
 function buildRowMap(kind, rec, sizes) {
@@ -213,9 +211,9 @@ function buildRowMap(kind, rec, sizes) {
       total += w; amt += w * pr;
     });
     m['金額'] = Math.round(amt);
+    m['廃棄kg'] = num(rec.waste);   // 買取の廃棄は支払・在庫の対象外
   } else {
     sizes.forEach(function (s) { var w = num(q[s]); m[s] = w; total += w; });
-    m['品種'] = String(rec['var'] || '');
     if (kind === 'harvest') {
       m['園地']   = String(rec.field || '');
       m['廃棄kg'] = num(rec.waste);   // 廃棄は在庫・出荷可能量には含めない
@@ -266,10 +264,10 @@ function readRecords(ss, kind, sizes) {
       sizes.forEach(function (s) { q[s] = num(col(row, s + '_kg')); p[s] = num(col(row, s + '_単価')); });
       rec.q = q; rec.p = p;
       rec.sup = String(col(row, '買取先') || '');
+      rec.waste = num(col(row, '廃棄kg'));
     } else {
       sizes.forEach(function (s) { q[s] = num(col(row, s)); });
       rec.q = q;
-      rec['var'] = String(col(row, '品種') || '');
       if (kind === 'harvest') {
         rec.field = String(col(row, '園地') || '');
         rec.waste = num(col(row, '廃棄kg'));

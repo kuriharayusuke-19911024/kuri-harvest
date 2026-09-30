@@ -193,7 +193,27 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
 
 <!-- 内職（鬼皮剥き） -->
 <section id="tab-peel" hidden>
-  <h2>鬼皮剥き（内職）を記録</h2>
+  <h2>渋皮むき栗の在庫</h2>
+  <div class="sum" style="grid-template-columns:repeat(auto-fit,minmax(100px,1fr))">
+    <div><small>良品 在庫</small><b id="pk-good">0<i>kg</i></b></div>
+    <div><small>傷あり 在庫</small><b id="pk-bad">0<i>kg</i></b></div>
+    <div><small>生栗 未返却</small><b id="pk-open">0<i>kg</i></b></div>
+  </div>
+
+  <h2>生栗を内職に渡す</h2>
+  <div class="row">
+    <div><label>日付</label><input type="date" id="po-date"></div>
+    <div><label>作業者</label><select id="po-who"></select></div>
+    <div><label>渡した量（kg）</label><input type="number" step="0.1" min="0" inputmode="decimal" id="po-kg" placeholder="0"></div>
+  </div>
+  <div class="row"><div><label>メモ</label><input id="po-memo" placeholder="任意"></div></div>
+  <button class="btn" id="po-save">渡した分を記録する</button>
+  <p class="note">生栗の在庫から自動で引かれます。</p>
+
+  <h3>作業者ごとの 渡した量／戻った量</h3>
+  <div class="tw"><table id="po-table"></table></div>
+
+  <h2 style="margin-top:24px">鬼皮剥き（内職）を記録</h2>
   <div class="row">
     <div><label>日付</label><input type="date" id="w-date"></div>
     <div><label>作業者</label><select id="w-who"></select></div>
@@ -210,7 +230,25 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
   <h3>この作業者の記録</h3>
   <div id="w-list"></div>
 
-  <h3>支払明細書を作る</h3>
+  <h2 style="margin-top:24px">渋皮むき栗を出荷</h2>
+  <div class="row">
+    <div><label>日付</label><input type="date" id="ps-date"></div>
+    <div><label>出荷先</label><input id="ps-dest" list="dest-list" placeholder="例：但馬米穀"></div>
+  </div>
+  <div class="sizes" style="grid-template-columns:1fr 1fr">
+    <div class="sz"><label>良品（kg）<br><span style="font-weight:400;color:#7a6a5a" id="ps-good-st"></span></label><input type="number" step="0.1" min="0" inputmode="decimal" id="ps-good" placeholder="0"></div>
+    <div class="sz"><label>傷あり（kg）<br><span style="font-weight:400;color:#7a6a5a" id="ps-bad-st"></span></label><input type="number" step="0.1" min="0" inputmode="decimal" id="ps-bad" placeholder="0"></div>
+  </div>
+  <div class="total">合計 <b id="ps-total">0</b> kg</div>
+  <div class="row">
+    <div><label>単価（円/kg・任意）</label><input type="number" id="ps-price" inputmode="decimal" placeholder="未入力可"></div>
+    <div><label>メモ</label><input id="ps-memo" placeholder="伝票番号など"></div>
+  </div>
+  <button class="btn" id="ps-save">渋皮むき栗の出荷を記録する</button>
+  <h3>渋皮むき栗の出荷記録</h3>
+  <div id="ps-list"></div>
+
+  <h3 style="margin-top:24px">支払明細書を作る</h3>
   <div class="row">
     <div><label>作業者</label><select id="wd-who"></select></div>
     <div><label>期間 開始</label><input type="date" id="wd-from"></div>
@@ -244,10 +282,20 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
     <div><small>収穫累計</small><b id="st-h">0<i>kg</i></b></div>
     <div><small>買取累計</small><b id="st-b">0<i>kg</i></b></div>
     <div><small>出荷累計</small><b id="st-s">0<i>kg</i></b></div>
-    <div><small>在庫</small><b id="st-z">0<i>kg</i></b></div>
+    <div><small>内職渡し</small><b id="st-po">0<i>kg</i></b></div>
+    <div><small>生栗 在庫</small><b id="st-z">0<i>kg</i></b></div>
     <div><small>廃棄累計</small><b id="st-w" style="font-size:15px">自社 0<i>kg</i>／買取 0<i>kg</i></b></div>
   </div>
   <div class="tw"><table id="st-table"></table></div>
+  <p class="note" style="margin-top:6px">内職に渡した生栗はサイズを問わないため、サイズ別の表には含めず「生栗 在庫」の合計から引いています。</p>
+  <h3>渋皮むき栗（内職）</h3>
+  <div class="sum" style="grid-template-columns:repeat(auto-fit,minmax(100px,1fr))">
+    <div><small>良品 入庫</small><b id="sp-gin">0<i>kg</i></b></div>
+    <div><small>傷あり 入庫</small><b id="sp-bin">0<i>kg</i></b></div>
+    <div><small>出荷累計</small><b id="sp-out">0<i>kg</i></b></div>
+    <div><small>良品 在庫</small><b id="sp-good">0<i>kg</i></b></div>
+    <div><small>傷あり 在庫</small><b id="sp-bad">0<i>kg</i></b></div>
+  </div>
   <h3>園地別 収穫量</h3>
   <div class="tw"><table id="st-field"></table></div>
   <h3>買取先別 買取量</h3>
@@ -260,7 +308,7 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
 <section id="tab-list" hidden>
   <h2>履歴</h2>
   <div class="filter">
-    <select id="l-kind"><option value="all">すべて</option><option value="h">収穫のみ</option><option value="s">出荷のみ</option><option value="b">買取のみ</option><option value="w">内職のみ</option></select>
+    <select id="l-kind"><option value="all">すべて</option><option value="h">収穫のみ</option><option value="s">出荷のみ</option><option value="b">買取のみ</option><option value="w">内職のみ</option><option value="po">内職渡しのみ</option><option value="ps">渋皮出荷のみ</option></select>
     <input type="month" id="l-month">
     <button class="btn tiny" id="l-csv">CSV出力</button>
   </div>
@@ -300,7 +348,7 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
     <button class="btn sub" id="exp-json">バックアップ（JSON）</button>
     <button class="btn danger" id="clear-all">全データ削除</button>
   </div>
-  <p class="note">データはGoogleスプレッドシート「栗収穫管理」に保存され、3人で同じ内容を共有します。「全データ削除」は記録（収穫・出荷・買取・内職）だけを消し、設定と作業予定・シート自体は残ります。</p>
+  <p class="note">データはGoogleスプレッドシート「栗収穫管理」に保存され、3人で同じ内容を共有します。「全データ削除」は記録（収穫・出荷・買取・内職・内職渡し・渋皮出荷）だけを消し、設定と作業予定・シート自体は残ります。</p>
 </section>
 </main>
 
@@ -334,7 +382,7 @@ const DEF={
   tasks:['栗拾い','選別','出荷','買取受入'],
   workers:['栗原直人','栗原優介','秋山龍之輔','栗原亜美','木村みき','栗原美智代','松本琉雅'],
   peelPrice:{good:1500,bad:300},
-  harvest:[],ship:[],buy:[],peel:[],schedule:{}
+  harvest:[],ship:[],buy:[],peel:[],peelOut:[],peelShip:[],schedule:{}
 };
 let D=JSON.parse(JSON.stringify(DEF));
 const $=id=>document.getElementById(id);
@@ -390,6 +438,10 @@ function normalize(d){
   });
   o.peel=Array.isArray(o.peel)?o.peel:[];
   o.peel.forEach(r=>{if(r.memo==null)r.memo='';['good','bad','gp','bp'].forEach(k=>{if(r[k]==null)r[k]=0})});
+  o.peelOut=Array.isArray(o.peelOut)?o.peelOut:[];
+  o.peelOut.forEach(r=>{if(r.memo==null)r.memo='';r.kg=+r.kg||0;if(r.who==null)r.who=''});
+  o.peelShip=Array.isArray(o.peelShip)?o.peelShip:[];
+  o.peelShip.forEach(r=>{if(r.memo==null)r.memo='';r.good=+r.good||0;r.bad=+r.bad||0;if(r.dest==null)r.dest='';if(r.price===''||r.price===undefined)r.price=null});
   return o;
 }
 async function boot(){
@@ -413,6 +465,13 @@ function stock(){
   const add=(arr,k)=>arr.forEach(r=>D.sizes.forEach(s=>{z[s][k]+=+r.q[s]||0}));
   add(D.harvest,'h');add(D.buy,'b');add(D.ship,'s');   // 廃棄は含めない
   return z;
+}
+const peelOutTotal=()=>D.peelOut.reduce((a,r)=>a+(+r.kg||0),0);
+function rawStockTotal(){const z=stock();let t=0;D.sizes.forEach(s=>{t+=z[s].h+z[s].b-z[s].s});return t-peelOutTotal()}
+function peelStock(){
+  const gin=D.peel.reduce((a,r)=>a+(+r.good||0),0),bin=D.peel.reduce((a,r)=>a+(+r.bad||0),0);
+  const gout=D.peelShip.reduce((a,r)=>a+(+r.good||0),0),bout=D.peelShip.reduce((a,r)=>a+(+r.bad||0),0);
+  return {gin,bin,gout,bout,good:gin-gout,bad:bin-bout};
 }
 
 /* ---- フォーム構築 ---- */
@@ -446,7 +505,7 @@ function buildForms(){
   if(!$('b-date').value)$('b-date').value=today();
 
   buildSizes($('h-sizes'),'h',false);buildWaste();buildSizes($('s-sizes'),'s',true);buildBuySizes();
-  $('dest-list').innerHTML=[...new Set(D.ship.map(r=>r.dest))].map(d=>`<option value="${d}">`).join('');
+  $('dest-list').innerHTML=[...new Set(D.ship.map(r=>r.dest).concat(D.peelShip.map(r=>r.dest)))].map(d=>`<option value="${d}">`).join('');
 }
 function buildWaste(){
   const cur=$('h-waste')?$('h-waste').value:'';
@@ -597,8 +656,15 @@ function calcPeel(){const g=+$('w-good').value||0,b=+$('w-bad').value||0;$('w-to
 ['w-good','w-bad','w-good-p','w-bad-p'].forEach(id=>$(id).oninput=calcPeel);
 function buildPeelForm(){
   fillSel($('w-who'),D.workers);$('w-who').insertAdjacentHTML('beforeend','<option value="__add__">＋ 作業者を追加…</option>');
-  fillSel($('wd-who'),D.workers);
+  fillSel($('wd-who'),D.workers);fillSel($('po-who'),D.workers);
   if(!$('w-date').value)$('w-date').value=today();
+  if(!$('po-date').value)$('po-date').value=today();
+  if(!$('ps-date').value)$('ps-date').value=today();
+  const pk=peelStock();
+  $('pk-good').innerHTML=fmt(pk.good)+'<i>kg</i>';$('pk-bad').innerHTML=fmt(pk.bad)+'<i>kg</i>';
+  $('pk-open').innerHTML=fmt(peelOutTotal()-pk.gin-pk.bin)+'<i>kg</i>';
+  $('ps-good-st').textContent=`(在庫 ${fmt(pk.good)})`;$('ps-bad-st').textContent=`(在庫 ${fmt(pk.bad)})`;
+  calcPeelShip();
   if(!$('w-good-p').value)$('w-good-p').value=D.peelPrice.good;
   if(!$('w-bad-p').value)$('w-bad-p').value=D.peelPrice.bad;
   $('c-peel-good').value=D.peelPrice.good;$('c-peel-bad').value=D.peelPrice.bad;
@@ -657,6 +723,72 @@ $('wd-make').onclick=()=>{
    <div class="foot" style="margin-top:30px;display:flex;justify-content:flex-end;gap:30px"><div>受領日：　　年　　月　　日</div><div>受領印・サイン：＿＿＿＿＿＿＿＿＿</div></div>`,
    `支払明細書_${who}_${today()}`);
 };
+
+/* ---- 生栗を内職に渡す ---- */
+$('po-save').onclick=async()=>{
+  const who=$('po-who').value,kg=+$('po-kg').value||0;
+  if(!$('po-date').value)return toast('日付を入力してください');
+  if(!who)return toast('作業者を選んでください');
+  if(kg<=0)return toast('渡した量を入力してください');
+  const rec={id:uid(),date:$('po-date').value,who,kg,memo:$('po-memo').value.trim()};
+  const doSave=async()=>{
+    if(!(await send('add',{kind:'peelOut',record:rec},'記録しました')))return;
+    D.peelOut.push(rec);$('po-kg').value='';$('po-memo').value='';renderAll();
+  };
+  if(rawStockTotal()<kg){$('modal-ok').textContent='記録する';confirmBox(`生栗の在庫（${fmt(rawStockTotal())}kg）を超えています。それでも記録しますか？`,()=>{doSave();$('modal-ok').textContent='削除する'})}
+  else doSave();
+};
+function cardPO(r){return `<div class="card"><div class="hd"><b>内職へ渡し → ${r.who}</b><span>${r.date}</span></div>
+ <div class="bd">生栗 <b>${fmt(r.kg)}</b> kg${r.memo?`<br>${r.memo}`:''}</div>
+ <div class="ft"><button class="btn danger" onclick="del('peelOut','${r.id}')">削除</button></div></div>`}
+function renderPeelOut(){
+  const who={};D.workers.forEach(w=>who[w]={out:0,g:0,b:0});
+  D.peelOut.forEach(r=>{who[r.who]=who[r.who]||{out:0,g:0,b:0};who[r.who].out+=+r.kg||0});
+  D.peel.forEach(r=>{who[r.who]=who[r.who]||{out:0,g:0,b:0};who[r.who].g+=+r.good||0;who[r.who].b+=+r.bad||0});
+  const ks=Object.keys(who).filter(k=>who[k].out||who[k].g||who[k].b);
+  $('po-table').innerHTML=ks.length?`<tr><th>作業者</th><th>渡した</th><th>戻った（良品）</th><th>戻った（傷あり）</th><th>未返却</th></tr>`+
+    ks.map(k=>{const w=who[k],open=w.out-w.g-w.b;return `<tr><td>${k}</td><td>${fmt(w.out)}</td><td>${fmt(w.g)}</td><td>${fmt(w.b)}</td><td class="${open<0?'neg':''}"><b>${fmt(open)}</b></td></tr>`}).join(''):
+    '<tr><td class="empty">まだ記録がありません</td></tr>';
+}
+
+/* ---- 渋皮むき栗の出荷 ---- */
+function calcPeelShip(){$('ps-total').textContent=fmt((+$('ps-good').value||0)+(+$('ps-bad').value||0))}
+['ps-good','ps-bad'].forEach(id=>$(id).oninput=calcPeelShip);
+$('ps-save').onclick=async()=>{
+  const dest=$('ps-dest').value.trim(),g=+$('ps-good').value||0,b=+$('ps-bad').value||0;
+  if(!$('ps-date').value)return toast('日付を入力してください');
+  if(!dest)return toast('出荷先を入力してください');
+  if(g+b<=0)return toast('出荷量を入力してください');
+  const pk=peelStock(),over=[];if(pk.good<g)over.push('良品');if(pk.bad<b)over.push('傷あり');
+  const doSave=async()=>{
+    const rec={id:uid(),date:$('ps-date').value,dest,good:g,bad:b,price:+$('ps-price').value||null,memo:$('ps-memo').value.trim()};
+    if(!(await send('add',{kind:'peelShip',record:rec},'出荷を記録しました')))return;
+    D.peelShip.push(rec);
+    $('ps-good').value='';$('ps-bad').value='';$('ps-price').value='';$('ps-memo').value='';
+    renderAll();showPeelShipDoc(rec.id);
+  };
+  if(over.length){$('modal-ok').textContent='記録する';confirmBox(`${over.join('・')}が在庫を超えています。それでも記録しますか？`,()=>{doSave();$('modal-ok').textContent='削除する'})}
+  else doSave();
+};
+function cardPS(r){return `<div class="card"><div class="hd"><b>渋皮むき栗 → ${r.dest}</b><span>${r.date}</span></div>
+ <div class="bd">良品 <b>${fmt(r.good)}</b> kg　／　傷あり <b>${fmt(r.bad)}</b> kg　／ 計 <b>${fmt(r.good+r.bad)}</b> kg${r.price?`　@${r.price}円`:''}${r.memo?`<br>${r.memo}`:''}</div>
+ <div class="ft"><button class="btn tiny" onclick="showPeelShipDoc('${r.id}')">納品書</button>　<button class="btn danger" onclick="del('peelShip','${r.id}')">削除</button></div></div>`}
+function renderPeelShipList(){
+  const rows=D.peelShip.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  $('ps-list').innerHTML=rows.length?rows.map(cardPS).join(''):'<div class="empty">まだ記録がありません</div>';
+}
+function showPeelShipDoc(id){
+  const r=D.peelShip.find(x=>x.id===id);if(!r)return;
+  const pr=+r.price||0,kg=r.good+r.bad;
+  const line=(n,w)=>w?`<tr><td>${n}</td><td>${fmt(w)}</td>${pr?`<td>${yen(pr)}</td><td>${yen(w*pr)}</td>`:''}</tr>`:'';
+  showDoc(docHead('納品書',honor(r.dest),`<div style="margin-top:6px">納品日：${jd(r.date)}</div><div>発行日：${jd(today())}</div>`)+
+   `<p>下記のとおり納品いたしました。</p>
+    <table><tr><th>品名</th><th>重量(kg)</th>${pr?'<th>単価(円/kg)</th><th>金額(円)</th>':''}</tr>${line('渋皮むき栗（良品）',r.good)}${line('渋皮むき栗（傷あり）',r.bad)}
+    <tr><td style="text-align:right"><b>合計</b></td><td><b>${fmt(kg)}</b></td>${pr?`<td></td><td><b>${yen(kg*pr)}</b></td>`:''}</tr></table>
+    ${pr?`<div class="grand">合計金額　${yen(kg*pr)} 円<small>（内消費税等 8%：${yen(Math.floor(kg*pr*8/108))} 円）</small></div>`:`<div class="grand">合計　${fmt(kg)} kg</div>`}
+    <div class="foot">${pr?'※単価・金額は税込（軽減税率8%対象）です。':'※単価は別途ご連絡いたします。'}${r.memo?'<br>'+r.memo:''}</div>`,
+   `納品書_渋皮むき栗_${r.dest}_${r.date}`);
+}
 
 /* ---- 作業予定 ---- */
 const shiftDate=(d,n)=>{const x=new Date(d+'T00:00:00');x.setDate(x.getDate()+n);return x.toLocaleDateString('sv-SE')};
@@ -723,7 +855,8 @@ function renderStock(){
   let html=`<tr><th>サイズ</th>${D.sizes.map(s=>`<th>${s}</th>`).join('')}<th>合計</th></tr>`+row('自社分',c=>c.h-c.s);
   if(D.buy.length)html+=row('買取分',c=>c.b)+row('在庫合計',c=>c.h+c.b-c.s);
   const tw=D.harvest.reduce((a,r)=>a+(+r.waste||0),0),tbw=D.buy.reduce((a,r)=>a+(+r.waste||0),0);
-  $('st-table').innerHTML=html;$('st-h').innerHTML=fmt(th)+'<i>kg</i>';$('st-s').innerHTML=fmt(ts)+'<i>kg</i>';$('st-b').innerHTML=fmt(tb)+'<i>kg</i>';$('st-z').innerHTML=fmt(th+tb-ts)+'<i>kg</i>';$('st-w').innerHTML=`自社 ${fmt(tw)}<i>kg</i>／買取 ${fmt(tbw)}<i>kg</i>`;
+  $('st-table').innerHTML=html;$('st-h').innerHTML=fmt(th)+'<i>kg</i>';$('st-s').innerHTML=fmt(ts)+'<i>kg</i>';$('st-b').innerHTML=fmt(tb)+'<i>kg</i>';const tpo=peelOutTotal();$('st-po').innerHTML=fmt(tpo)+'<i>kg</i>';$('st-z').innerHTML=fmt(th+tb-ts-tpo)+'<i>kg</i>';
+  const pk=peelStock();$('sp-gin').innerHTML=fmt(pk.gin)+'<i>kg</i>';$('sp-bin').innerHTML=fmt(pk.bin)+'<i>kg</i>';$('sp-out').innerHTML=fmt(pk.gout+pk.bout)+'<i>kg</i>';$('sp-good').innerHTML=fmt(pk.good)+'<i>kg</i>';$('sp-bad').innerHTML=fmt(pk.bad)+'<i>kg</i>';$('st-w').innerHTML=`自社 ${fmt(tw)}<i>kg</i>／買取 ${fmt(tbw)}<i>kg</i>`;
   const grp=(arr,key)=>{const g={};arr.forEach(r=>{g[r[key]]=g[r[key]]||{n:0,q:{}};g[r[key]].n+=sum(r.q);D.sizes.forEach(s=>g[r[key]].q[s]=(g[r[key]].q[s]||0)+(+r.q[s]||0))});return g};
   const tbl=(g,label,w)=>{const ks=Object.keys(g);if(!ks.length)return `<tr><td class="empty">記録なし</td></tr>`;return `<tr><th>${label}</th>${D.sizes.map(s=>`<th>${s}</th>`).join('')}<th>合計</th>${w?'<th>廃棄</th>':''}</tr>`+ks.sort((a,b)=>g[b].n-g[a].n).map(k=>`<tr><td>${k}</td>${D.sizes.map(s=>`<td>${fmt(g[k].q[s]||0)}</td>`).join('')}<td><b>${fmt(g[k].n)}</b></td>${w?`<td>${fmt(w[k]||0)}</td>`:''}</tr>`).join('')};
   const fw={};D.harvest.forEach(r=>{fw[r.field]=(fw[r.field]||0)+(+r.waste||0)});
@@ -739,9 +872,11 @@ function renderList(){
   if(k==='all'||k==='s')rows=rows.concat(D.ship.map(r=>({...r,k:'s'})));
   if(k==='all'||k==='b')rows=rows.concat(D.buy.map(r=>({...r,k:'b'})));
   if(k==='all'||k==='w')rows=rows.concat(D.peel.map(r=>({...r,k:'w'})));
+  if(k==='all'||k==='po')rows=rows.concat(D.peelOut.map(r=>({...r,k:'po'})));
+  if(k==='all'||k==='ps')rows=rows.concat(D.peelShip.map(r=>({...r,k:'ps'})));
   if(m)rows=rows.filter(r=>r.date.startsWith(m));
   rows.sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
-  $('l-body').innerHTML=rows.length?rows.map(r=>r.k==='h'?cardH(r):r.k==='b'?cardB(r):r.k==='w'?cardW(r):cardS(r)).join(''):'<div class="empty">該当する記録がありません</div>';
+  $('l-body').innerHTML=rows.length?rows.map(r=>r.k==='h'?cardH(r):r.k==='b'?cardB(r):r.k==='w'?cardW(r):r.k==='po'?cardPO(r):r.k==='ps'?cardPS(r):cardS(r)).join(''):'<div class="empty">該当する記録がありません</div>';
 }
 $('l-kind').onchange=renderList;$('l-month').onchange=renderList;
 function renderSettings(){
@@ -780,13 +915,15 @@ $('l-csv').onclick=()=>{
   const rows=[...D.harvest.map(r=>['収穫',r.date,r.field,...D.sizes.map(s=>r.q[s]||0),sum(r.q),+r.waste||0,'','',r.memo||'']),
               ...D.buy.map(r=>['買取',r.date,r.sup,...D.sizes.map(s=>r.q[s]||0),sum(r.q),+r.waste||0,D.sizes.map(s=>`${s}:${r.p[s]||0}`).join(' '),buyAmount(r),r.memo||'']),
               ...D.ship.map(r=>['出荷',r.date,r.dest,...D.sizes.map(s=>r.q[s]||0),sum(r.q),'',r.price||'',r.price?Math.round(sum(r.q)*r.price):'',r.memo||'']),
-              ...D.peel.map(r=>['内職',r.date,r.who,...D.sizes.map(()=>''),fmt(r.good+r.bad),'',`良品${r.gp}/傷${r.bp}`,peelAmt(r),`良品${r.good}kg 傷あり${r.bad}kg ${r.memo||''}`])];
+              ...D.peel.map(r=>['内職',r.date,r.who,...D.sizes.map(()=>''),fmt(r.good+r.bad),'',`良品${r.gp}/傷${r.bp}`,peelAmt(r),`良品${r.good}kg 傷あり${r.bad}kg ${r.memo||''}`]),
+              ...D.peelOut.map(r=>['内職渡し',r.date,r.who,...D.sizes.map(()=>''),r.kg,'','','',r.memo||'']),
+              ...D.peelShip.map(r=>['渋皮出荷',r.date,r.dest,...D.sizes.map(()=>''),fmt(r.good+r.bad),'',r.price||'',r.price?Math.round((r.good+r.bad)*r.price):'',`良品${r.good}kg 傷あり${r.bad}kg ${r.memo||''}`])];
   rows.sort((a,b)=>a[1].localeCompare(b[1]));
   dl(`栗収穫管理_${today()}.csv`,[head,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n'),'text/csv');
 };
 $('exp-json').onclick=()=>dl(`kuri-backup_${today()}.json`,JSON.stringify(D,null,1),'application/json');
-$('clear-all').onclick=()=>confirmBox('すべての記録（収穫・出荷・買取・内職）を削除します。元に戻せません。',()=>{
-  const n=D.harvest.length+D.ship.length+D.buy.length+D.peel.length;
+$('clear-all').onclick=()=>confirmBox('すべての記録（収穫・出荷・買取・内職・内職渡し・渋皮出荷）を削除します。元に戻せません。',()=>{
+  const n=D.harvest.length+D.ship.length+D.buy.length+D.peel.length+D.peelOut.length+D.peelShip.length;
   if(!n)return toast('削除する記録がありません');
   confirmBox(`本当によろしいですか？　記録 ${n} 件をスプレッドシートから削除します。（設定・作業予定は残ります）`,deleteAllRecords);
 });
@@ -794,7 +931,7 @@ async function deleteAllRecords(){
   if(busy)return;
   if(!apiReady())return toast('API_URL が未設定です');
   const jobs=[];
-  ['harvest','ship','buy','peel'].forEach(k=>D[k].forEach(r=>jobs.push({kind:k,id:r.id})));
+  ['harvest','ship','buy','peel','peelOut','peelShip'].forEach(k=>D[k].forEach(r=>jobs.push({kind:k,id:r.id})));
   if(!jobs.length)return toast('削除する記録がありません');
   setBusy(true);
   let ng=0;
@@ -807,7 +944,7 @@ async function deleteAllRecords(){
   toast(ng?'削除できませんでした。通信を確認してください':'削除しました');
 }
 
-function renderAll(){buildForms();buildPeelForm();renderToday();renderBuyList();renderPeelList();renderPlan();renderStock();renderList();renderSettings()}
+function renderAll(){buildForms();buildPeelForm();renderToday();renderBuyList();renderPeelList();renderPeelOut();renderPeelShipList();renderPlan();renderStock();renderList();renderSettings()}
 renderAll();
 boot();
 </script>

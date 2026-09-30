@@ -12,9 +12,9 @@
  * API
  *   GET  ?action=getAll
  *     -> {fields,sizes,sups,mems,tasks,workers,prices,peelPrice,
- *         harvest,ship,buy,peel,schedule}
- *   POST {action:'add',          kind:'harvest'|'ship'|'buy'|'peel', record:{...}}
- *   POST {action:'delete',       kind:'harvest'|'ship'|'buy'|'peel', id:'...'}
+ *         harvest,ship,buy,peel,peelOut,peelShip,schedule}
+ *   POST {action:'add',          kind:'harvest'|'ship'|'buy'|'peel'|'peelOut'|'peelShip', record:{...}}
+ *   POST {action:'delete',       kind:同上, id:'...'}
  *   POST {action:'saveSettings', fields?, sizes?, sups?, mems?, tasks?,
  *                                workers?, prices?, peelPrice?, schedule?}
  *
@@ -23,7 +23,7 @@
 
 var SPREADSHEET_ID = '';                       // 空ならアクティブなスプレッドシート
 var SETTING_SHEET  = '設定';
-var SHEETS = { harvest: '収穫', ship: '出荷', buy: '買取', peel: '内職' };
+var SHEETS = { harvest: '収穫', ship: '出荷', buy: '買取', peel: '内職', peelOut: '内職渡し', peelShip: '渋皮出荷' };
 
 var DEFAULTS = {
   fields:    ['今中', '段宿'],
@@ -100,7 +100,9 @@ function getAll() {
     harvest:   readRecords(ss, 'harvest', st.sizes),
     ship:      readRecords(ss, 'ship',    st.sizes),
     buy:       readRecords(ss, 'buy',     st.sizes),
-    peel:      readRecords(ss, 'peel',    st.sizes)
+    peel:      readRecords(ss, 'peel',    st.sizes),
+    peelOut:   readRecords(ss, 'peelOut', st.sizes),
+    peelShip:  readRecords(ss, 'peelShip',st.sizes)
   };
 }
 
@@ -111,7 +113,7 @@ function addRecord(kind, rec) {
   var ss = ss_();
   var st = readSettings(ss);
   // 設定にないサイズがレコードに含まれていても取りこぼさない（peelは無関係）
-  var sizes = (kind === 'peel')
+  var sizes = (kind === 'peel' || kind === 'peelOut' || kind === 'peelShip')
     ? st.sizes
     : unique(st.sizes.concat(Object.keys(rec.q || {})));
 
@@ -174,6 +176,12 @@ function headersFor(kind, sizes) {
   if (kind === 'peel') {
     return ['id', '日付', '作業者', '良品kg', '良品単価', '傷ありkg', '傷あり単価', '合計kg', '金額', 'メモ', '登録日時'];
   }
+  if (kind === 'peelOut') {
+    return ['id', '日付', '作業者', 'kg', 'メモ', '登録日時'];
+  }
+  if (kind === 'peelShip') {
+    return ['id', '日付', '出荷先', '良品kg', '傷ありkg', '合計kg', '単価', '金額', 'メモ', '登録日時'];
+  }
   return ['id', '日付', '買取先']
     .concat(sizes.map(function (s) { return s + '_kg'; }))
     .concat(sizes.map(function (s) { return s + '_単価'; }))
@@ -196,6 +204,22 @@ function buildRowMap(kind, rec, sizes) {
     m['傷あり単価'] = bp;
     m['合計kg']     = Math.round((g + b) * 10) / 10;
     m['金額']       = Math.round(g * gp + b * bp);
+    return m;
+  }
+  if (kind === 'peelOut') {
+    m['作業者'] = String(rec.who || '');
+    m['kg']     = num(rec.kg);
+    return m;
+  }
+  if (kind === 'peelShip') {
+    var sg = num(rec.good), sb = num(rec.bad);
+    var hasP = !(rec.price === null || rec.price === undefined || rec.price === '');
+    m['出荷先']   = String(rec.dest || '');
+    m['良品kg']   = sg;
+    m['傷ありkg'] = sb;
+    m['合計kg']   = Math.round((sg + sb) * 10) / 10;
+    m['単価']     = hasP ? num(rec.price) : '';
+    m['金額']     = hasP ? Math.round((sg + sb) * num(rec.price)) : '';
     return m;
   }
 
@@ -254,6 +278,21 @@ function readRecords(ss, kind, sizes) {
       rec.bad  = num(col(row, '傷ありkg'));
       rec.gp   = num(col(row, '良品単価'));
       rec.bp   = num(col(row, '傷あり単価'));
+      out.push(rec);
+      continue;
+    }
+    if (kind === 'peelOut') {
+      rec.who = String(col(row, '作業者') || '');
+      rec.kg  = num(col(row, 'kg'));
+      out.push(rec);
+      continue;
+    }
+    if (kind === 'peelShip') {
+      rec.dest = String(col(row, '出荷先') || '');
+      rec.good = num(col(row, '良品kg'));
+      rec.bad  = num(col(row, '傷ありkg'));
+      var spv = col(row, '単価');
+      rec.price = (spv === '' || spv === null || spv === undefined) ? null : num(spv);
       out.push(rec);
       continue;
     }

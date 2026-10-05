@@ -113,7 +113,7 @@ function addRecord(kind, rec) {
   var ss = ss_();
   var st = readSettings(ss);
   // 設定にないサイズがレコードに含まれていても取りこぼさない（peelは無関係）
-  var sizes = (kind === 'peel' || kind === 'peelOut' || kind === 'peelShip')
+  var sizes = (kind === 'peel' || kind === 'peelShip')
     ? st.sizes
     : unique(st.sizes.concat(Object.keys(rec.q || {})));
 
@@ -177,7 +177,7 @@ function headersFor(kind, sizes) {
     return ['id', '日付', '作業者', '良品kg', '良品単価', '傷ありkg', '傷あり単価', '合計kg', '金額', 'メモ', '登録日時'];
   }
   if (kind === 'peelOut') {
-    return ['id', '日付', '作業者', 'kg', 'メモ', '登録日時'];
+    return ['id', '日付', '作業者'].concat(sizes).concat(['kg', 'メモ', '登録日時']);
   }
   if (kind === 'peelShip') {
     return ['id', '日付', '出荷先', '良品kg', '傷ありkg', '合計kg', '単価', '金額', 'メモ', '登録日時'];
@@ -207,8 +207,10 @@ function buildRowMap(kind, rec, sizes) {
     return m;
   }
   if (kind === 'peelOut') {
+    var oq = rec.q || {}, ot = 0;
     m['作業者'] = String(rec.who || '');
-    m['kg']     = num(rec.kg);
+    sizes.forEach(function (s) { var w = num(oq[s]); m[s] = w; ot += w; });
+    m['kg']     = ot > 0 ? Math.round(ot * 10) / 10 : num(rec.kg);
     return m;
   }
   if (kind === 'peelShip') {
@@ -283,7 +285,10 @@ function readRecords(ss, kind, sizes) {
     }
     if (kind === 'peelOut') {
       rec.who = String(col(row, '作業者') || '');
-      rec.kg  = num(col(row, 'kg'));
+      var oq2 = {};
+      sizes.forEach(function (s) { oq2[s] = num(col(row, s)); });
+      rec.q  = oq2;
+      rec.kg = num(col(row, 'kg'));
       out.push(rec);
       continue;
     }

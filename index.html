@@ -170,7 +170,7 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
     <div><label>買取先</label><select id="b-sup"></select></div>
   </div>
   <div class="row" id="b-newsup" hidden><div><input id="b-newsup-name" placeholder="新しい買取先の名前"></div><button class="btn sub" id="b-newsup-ok">この買取先を追加</button></div>
-  <label>サイズ別 重量（kg）と単価（円/kg・税込）</label>
+  <label>サイズ別 重量（kg）と単価（円/kg・税込）<span id="b-price-note" style="color:var(--kuri-dk);font-weight:700;margin-left:8px"></span></label>
   <div class="sizes" id="b-sizes"></div>
   <div class="total">合計 <b id="b-total">0</b> kg　／　金額 <b id="b-amt">0</b> 円</div>
   <div class="row"><div><label>メモ</label><input id="b-memo" placeholder="伝票番号など"></div></div>
@@ -345,6 +345,9 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
   <div class="row"><div><input id="add-sup" placeholder="買取先名を入力"></div><button class="btn sub" id="add-sup-btn">追加</button></div>
   <h3>買取単価（円/kg・税込）　※記録時に個別変更可</h3>
   <div class="sizes" id="c-prices"></div>
+  <h3>買取先別の単価（空欄＝上の共通単価）</h3>
+  <div class="row"><div><label>買取先</label><select id="c-sp-sup"></select></div></div>
+  <div class="sizes" id="c-sp-prices"></div>
   <h3>データ</h3>
   <div class="row">
     <button class="btn sub" id="exp-json">バックアップ（JSON）</button>
@@ -384,6 +387,7 @@ const DEF={
   tasks:['栗拾い','選別','出荷','買取受入'],
   workers:['栗原直人','栗原優介','秋山龍之輔','栗原亜美','木村みき','栗原美智代','松本琉雅'],
   peelPrice:{good:1500,bad:300},
+  supPrices:{'荻野運送':{'3L以上':2300,'2L':1800,'L':1400}},
   harvest:[],ship:[],buy:[],peel:[],peelOut:[],peelShip:[],schedule:{}
 };
 let D=JSON.parse(JSON.stringify(DEF));
@@ -427,13 +431,13 @@ function settingsPayload(over){
   return Object.assign({
     fields:D.fields,sizes:D.sizes,sups:D.sups,
     mems:D.mems,tasks:D.tasks,workers:D.workers,
-    prices:D.prices,peelPrice:D.peelPrice
+    prices:D.prices,peelPrice:D.peelPrice,supPrices:D.supPrices
   },over||{});
 }
 function normalize(d){
   const o=Object.assign(JSON.parse(JSON.stringify(DEF)),d||{});
   ['fields','sizes','sups','mems','tasks','workers'].forEach(k=>{if(!Array.isArray(o[k]))o[k]=DEF[k].slice()});
-  ['prices','peelPrice','schedule'].forEach(k=>{if(!o[k]||typeof o[k]!=='object'||Array.isArray(o[k]))o[k]=JSON.parse(JSON.stringify(DEF[k]))});
+  ['prices','peelPrice','schedule','supPrices'].forEach(k=>{if(!o[k]||typeof o[k]!=='object'||Array.isArray(o[k]))o[k]=JSON.parse(JSON.stringify(DEF[k]))});
   ['harvest','ship','buy'].forEach(k=>{
     o[k]=Array.isArray(o[k])?o[k]:[];
     o[k].forEach(r=>{if(!r.q||typeof r.q!=='object')r.q={};if(k==='buy'&&(!r.p||typeof r.p!=='object'))r.p={};if(r.memo==null)r.memo='';if(k!=='ship')r.waste=+r.waste||0});
@@ -488,12 +492,14 @@ function buildSizes(cont,prefix,withStock){
   cont.querySelectorAll('input').forEach(i=>i.oninput=()=>calcTotal(prefix));
   calcTotal(prefix);
 }
+function priceFor(sup){const o=(D.supPrices&&D.supPrices[sup])||{};return Object.assign({},D.prices,o)}
 function buildBuySizes(){
-  const cur=$('b-waste')?$('b-waste').value:'';
-  $('b-sizes').innerHTML=D.sizes.map(s=>`<div class="sz"><label>${s}</label><input type="number" step="0.1" min="0" inputmode="decimal" data-size="${s}" data-p="b" placeholder="kg"><input type="number" min="0" inputmode="numeric" data-size="${s}" data-pp="b" value="${D.prices[s]||''}" placeholder="円/kg" style="margin-top:4px;font-size:14px"></div>`).join('')+
+  const cur=$('b-waste')?$('b-waste').value:'';const pr=priceFor($('b-sup').value);
+  $('b-sizes').innerHTML=D.sizes.map(s=>`<div class="sz"><label>${s}</label><input type="number" step="0.1" min="0" inputmode="decimal" data-size="${s}" data-p="b" placeholder="kg"><input type="number" min="0" inputmode="numeric" data-size="${s}" data-pp="b" value="${pr[s]||''}" placeholder="円/kg" style="margin-top:4px;font-size:14px"></div>`).join('')+
     '<div class="sz"><label>廃棄（kg）</label><input type="number" step="0.1" min="0" inputmode="decimal" id="b-waste" placeholder="0"></div>';
   if(cur)$('b-waste').value=cur;
   $('b-sizes').querySelectorAll('input').forEach(i=>i.oninput=calcBuy);calcBuy();
+  const note=$('b-price-note');if(note){const sp=D.supPrices&&D.supPrices[$('b-sup').value];note.textContent=sp?`${$('b-sup').value} 専用の単価を適用しています`:''}
 }
 function readPrices(){const p={};document.querySelectorAll('[data-pp="b"]').forEach(i=>{p[i.dataset.size]=+i.value||0});return p}
 function calcBuy(){const q=readSizes('b'),p=readPrices();$('b-total').textContent=fmt(sum(q));$('b-amt').textContent=yen(D.sizes.reduce((a,s)=>a+(q[s]||0)*(p[s]||0),0))}
@@ -547,7 +553,7 @@ $('s-save').onclick=async()=>{
 };
 
 /* ---- 買取保存 ---- */
-$('b-sup').onchange=()=>{const add=$('b-sup').value==='__add__';$('b-newsup').hidden=!add;if(add){$('b-newsup-name').focus()}else renderBuyList()};
+$('b-sup').onchange=()=>{const add=$('b-sup').value==='__add__';$('b-newsup').hidden=!add;if(add){$('b-newsup-name').focus()}else{buildBuySizes();renderBuyList()}};
 $('b-newsup-ok').onclick=async()=>{
   const v=$('b-newsup-name').value.trim();
   if(!v)return toast('名前を入力してください');
@@ -890,6 +896,7 @@ function renderSettings(){
   const chips=(arr,kind)=>arr.map((v,i)=>`<span class="chip">${v}<button title="削除" onclick="rmItem('${kind}',${i})">×</button></span>`).join('')||'<span class="empty">未登録</span>';
   $('c-fields').innerHTML=chips(D.fields,'fields');$('c-sizes').innerHTML=chips(D.sizes,'sizes');$('c-sups').innerHTML=chips(D.sups,'sups');$('c-mems').innerHTML=chips(D.mems,'mems');$('c-workers').innerHTML=chips(D.workers,'workers');$('c-tasks').innerHTML=chips(D.tasks,'tasks');
   $('c-prices').innerHTML=D.sizes.map(s=>`<div class="sz"><label>${s}</label><input type="number" min="0" inputmode="numeric" value="${D.prices[s]||''}" placeholder="円/kg" onchange="savePrice('${s}',this.value)"></div>`).join('');
+  fillSel($('c-sp-sup'),D.sups);renderSupPrices();
 }
 function rmItem(kind,i){confirmBox(`「${D[kind][i]}」を一覧から外しますか？（過去の記録は残ります）`,async()=>{
   const next=D[kind].slice();next.splice(i,1);
@@ -902,6 +909,18 @@ async function addItem(kind,inputId){
   const next=D[kind].concat([v]);
   if(!(await send('saveSettings',settingsPayload({[kind]:next}),'追加しました')))return;
   D[kind]=next;$(inputId).value='';renderAll();
+}
+function renderSupPrices(){
+  const sup=$('c-sp-sup').value,o=(D.supPrices&&D.supPrices[sup])||{};
+  $('c-sp-prices').innerHTML=D.sizes.map(s=>`<div class="sz"><label>${s}</label><input type="number" min="0" inputmode="numeric" value="${o[s]||''}" placeholder="${D.prices[s]||''}" onchange="saveSupPrice('${sup}','${s}',this.value)"></div>`).join('');
+}
+$('c-sp-sup').onchange=renderSupPrices;
+async function saveSupPrice(sup,s,val){
+  const next=JSON.parse(JSON.stringify(D.supPrices||{}));next[sup]=next[sup]||{};
+  if(+val>0)next[sup][s]=+val;else delete next[sup][s];
+  if(!Object.keys(next[sup]).length)delete next[sup];
+  if(!(await send('saveSettings',settingsPayload({supPrices:next}),'単価を保存しました')))return;
+  D.supPrices=next;buildBuySizes();renderSupPrices();
 }
 async function savePrice(s,val){
   const next=Object.assign({},D.prices);next[s]=+val||0;

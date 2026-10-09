@@ -16,7 +16,7 @@
  *   POST {action:'add',          kind:'harvest'|'ship'|'buy'|'peel'|'peelOut'|'peelShip', record:{...}}
  *   POST {action:'delete',       kind:同上, id:'...'}
  *   POST {action:'saveSettings', fields?, sizes?, sups?, mems?, tasks?,
- *                                workers?, prices?, peelPrice?, schedule?}
+ *                                workers?, prices?, peelPrice?, supPrices?, schedule?}
  *
  * 応答はすべて {ok:true, data:...} / {ok:false, error:'...'}
  */
@@ -34,11 +34,12 @@ var DEFAULTS = {
   workers:   ['栗原直人', '栗原優介', '秋山龍之輔', '栗原亜美', '木村みき', '栗原美智代', '松本琉雅'],
   prices:    { '3L以上': 1700, '2L': 1500, 'L': 1100, 'M': 700 },
   peelPrice: { good: 1500, bad: 300 },
+  supPrices: { '荻野運送': { '3L以上': 2300, '2L': 1800, 'L': 1400 } },
   schedule:  {}
 };
 
 var ARR_KEYS = ['fields', 'sizes', 'sups', 'mems', 'tasks', 'workers'];
-var OBJ_KEYS = ['prices', 'peelPrice', 'schedule'];
+var OBJ_KEYS = ['prices', 'peelPrice', 'supPrices', 'schedule'];
 
 /* ===================== エントリポイント ===================== */
 
@@ -96,6 +97,7 @@ function getAll() {
     workers:   st.workers,
     prices:    st.prices,
     peelPrice: st.peelPrice,
+    supPrices: st.supPrices,
     schedule:  st.schedule,
     harvest:   readRecords(ss, 'harvest', st.sizes),
     ship:      readRecords(ss, 'ship',    st.sizes),

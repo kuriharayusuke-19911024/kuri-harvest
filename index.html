@@ -121,6 +121,7 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
     <button data-tab="buy">買取</button>
     <button data-tab="plan">予定</button>
     <button data-tab="peel">内職</button>
+    <button data-tab="goods">加工品</button>
     <button data-tab="stock">在庫</button>
     <button data-tab="list">履歴</button>
     <button data-tab="setting">設定</button>
@@ -261,6 +262,28 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
   <p class="note">期間は空欄なら全期間で作成します。</p>
 </section>
 
+<!-- 加工品 -->
+<section id="tab-goods" hidden>
+  <h2>加工品の在庫</h2>
+  <div class="tw"><table id="g-stock"></table></div>
+  <p class="note">注文発送管理アプリで「発送済」にすると、ここから自動で減ります（履歴に「注文No.○○（自動）」と残ります）。</p>
+
+  <h2 style="margin-top:24px">加工品の入庫・出庫を記録</h2>
+  <div class="row">
+    <div><label>日付</label><input type="date" id="g-date"></div>
+    <div><label>区分</label><select id="g-dir"><option value="in">入庫（製造・仕入）</option><option value="out">出庫（手動）</option></select></div>
+  </div>
+  <div class="row">
+    <div><label>商品</label><select id="g-item"></select></div>
+    <div><label>数量</label><input type="number" step="1" min="0" inputmode="numeric" id="g-qty" placeholder="0"></div>
+  </div>
+  <div class="row"><div><label>メモ</label><input id="g-memo" placeholder="製造日・ロットなど"></div></div>
+  <button class="btn" id="g-save">記録する</button>
+
+  <h3>加工品の記録</h3>
+  <div id="g-list"></div>
+</section>
+
 <!-- 予定 -->
 <section id="tab-plan" hidden>
   <h2>作業予定</h2>
@@ -297,6 +320,8 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
     <div><small>良品 在庫</small><b id="sp-good">0<i>kg</i></b></div>
     <div><small>傷あり 在庫</small><b id="sp-bad">0<i>kg</i></b></div>
   </div>
+  <h3>加工品</h3>
+  <div class="tw"><table id="st-goods"></table></div>
   <h3>園地別 収穫量</h3>
   <div class="tw"><table id="st-field"></table></div>
   <h3>買取先別 買取量</h3>
@@ -309,7 +334,7 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
 <section id="tab-list" hidden>
   <h2>履歴</h2>
   <div class="filter">
-    <select id="l-kind"><option value="all">すべて</option><option value="h">収穫のみ</option><option value="s">出荷のみ</option><option value="b">買取のみ</option><option value="w">内職のみ</option><option value="po">内職渡しのみ</option><option value="ps">渋皮出荷のみ</option></select>
+    <select id="l-kind"><option value="all">すべて</option><option value="h">収穫のみ</option><option value="s">出荷のみ</option><option value="b">買取のみ</option><option value="w">内職のみ</option><option value="po">内職渡しのみ</option><option value="ps">渋皮出荷のみ</option><option value="g">加工品のみ</option></select>
     <input type="month" id="l-month">
     <button class="btn tiny" id="l-csv">CSV出力</button>
   </div>
@@ -339,6 +364,10 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
     <div class="sz"><label>良品</label><input type="number" min="0" inputmode="numeric" id="c-peel-good"></div>
     <div class="sz"><label>傷あり</label><input type="number" min="0" inputmode="numeric" id="c-peel-bad"></div>
   </div>
+  <h3>加工品の商品</h3>
+  <div class="chips" id="c-goods"></div>
+  <div class="row"><div><input id="add-goods" placeholder="商品名（例：丹波栗ペースト 2kg）"></div><div style="flex:0 0 100px"><input id="add-goods-unit" placeholder="単位" value="パック"></div><button class="btn sub" id="add-goods-btn">追加</button></div>
+  <p class="note">商品名は注文発送管理アプリの商品名と同じにしてください（自動で減らす対応に使います）。</p>
   <h3>買取先</h3>
   <div class="chips" id="c-sups"></div>
   <div class="row"><div><input id="add-sup" placeholder="買取先名を入力"></div><button class="btn sub" id="add-sup-btn">追加</button></div>
@@ -387,7 +416,8 @@ const DEF={
   workers:['栗原直人','栗原優介','秋山龍之輔','栗原亜美','木村みき','栗原美智代','松本琉雅'],
   peelPrice:{good:1500,bad:300},
   supPrices:{'荻野運送':{'3L以上':2300,'2L':1800,'L':1400}},
-  harvest:[],ship:[],buy:[],peel:[],peelOut:[],peelShip:[],schedule:{}
+  goodsItems:[{name:'丹波栗ペースト 500g',unit:'パック'},{name:'丹波栗ペースト 1kg',unit:'パック'},{name:'丹波栗ペースト 2kg',unit:'パック'},{name:'丹波栗 ボイルドマロン 1kg',unit:'パック'},{name:'丹波栗渋皮煮 1号缶（固形物1.9kg）',unit:'缶'},{name:'丹波栗 甘露煮 1号缶（固形物1.9kg）',unit:'缶'}],
+  harvest:[],ship:[],buy:[],peel:[],peelOut:[],peelShip:[],goods:[],schedule:{}
 };
 let D=JSON.parse(JSON.stringify(DEF));
 const $=id=>document.getElementById(id);
@@ -430,7 +460,7 @@ function settingsPayload(over){
   return Object.assign({
     fields:D.fields,sizes:D.sizes,sups:D.sups,
     mems:D.mems,tasks:D.tasks,workers:D.workers,
-    prices:D.prices,peelPrice:D.peelPrice,supPrices:D.supPrices
+    prices:D.prices,peelPrice:D.peelPrice,supPrices:D.supPrices,goodsItems:D.goodsItems
   },over||{});
 }
 function normalize(d){
@@ -447,6 +477,10 @@ function normalize(d){
   o.peelOut.forEach(r=>{if(r.memo==null)r.memo='';if(r.who==null)r.who='';if(!r.q||typeof r.q!=='object')r.q={};const qs=sum(r.q);r.kg=qs>0?qs:(+r.kg||0)});
   o.peelShip=Array.isArray(o.peelShip)?o.peelShip:[];
   o.peelShip.forEach(r=>{if(r.memo==null)r.memo='';r.good=+r.good||0;r.bad=+r.bad||0;if(r.dest==null)r.dest='';if(r.price===''||r.price===undefined)r.price=null});
+  if(!Array.isArray(o.goodsItems)||!o.goodsItems.length)o.goodsItems=JSON.parse(JSON.stringify(DEF.goodsItems));
+  o.goodsItems=o.goodsItems.map(g=>typeof g==='string'?{name:g,unit:'個'}:{name:String(g.name||''),unit:String(g.unit||'個')}).filter(g=>g.name);
+  o.goods=Array.isArray(o.goods)?o.goods:[];
+  o.goods.forEach(r=>{if(r.memo==null)r.memo='';r.qty=+r.qty||0;r.dir=r.dir==='out'?'out':'in';if(r.item==null)r.item=''});
   return o;
 }
 async function boot(){
@@ -779,9 +813,9 @@ $('ps-save').onclick=async()=>{
   if(over.length){$('modal-ok').textContent='記録する';confirmBox(`${over.join('・')}が在庫を超えています。それでも記録しますか？`,()=>{doSave();$('modal-ok').textContent='削除する'})}
   else doSave();
 };
-function cardPS(r){return `<div class="card"><div class="hd"><b>渋皮むき栗 → ${r.dest}</b><span>${r.date}</span></div>
+function cardPS(r){const auto=/^ord_/.test(r.id);return `<div class="card"><div class="hd"><b>渋皮むき栗 → ${r.dest}</b><span>${r.date}</span></div>
  <div class="bd">良品 <b>${fmt(r.good)}</b> kg　／　傷あり <b>${fmt(r.bad)}</b> kg　／ 計 <b>${fmt(r.good+r.bad)}</b> kg${r.price?`　@${r.price}円`:''}${r.memo?`<br>${r.memo}`:''}</div>
- <div class="ft"><button class="btn tiny" onclick="showPeelShipDoc('${r.id}')">納品書</button>　<button class="btn danger" onclick="del('peelShip','${r.id}')">削除</button></div></div>`}
+ <div class="ft"><button class="btn tiny" onclick="showPeelShipDoc('${r.id}')">納品書</button>　${auto?'<span style="color:var(--sub);font-size:12px">注文アプリから自動登録</span>':`<button class="btn danger" onclick="del('peelShip','${r.id}')">削除</button>`}</div></div>`}
 function renderPeelShipList(){
   const rows=D.peelShip.slice().sort((a,b)=>b.date.localeCompare(a.date));
   $('ps-list').innerHTML=rows.length?rows.map(cardPS).join(''):'<div class="empty">まだ記録がありません</div>';
@@ -798,6 +832,48 @@ function showPeelShipDoc(id){
     <div class="foot">${pr?'※単価・金額は税込（軽減税率8%対象）です。':'※単価は別途ご連絡いたします。'}${r.memo?'<br>'+r.memo:''}</div>`,
    `納品書_渋皮むき栗_${r.dest}_${r.date}`);
 }
+
+/* ---- 加工品 ---- */
+function goodsStock(){const st={};D.goodsItems.forEach(g=>st[g.name]={in:0,out:0});D.goods.forEach(r=>{st[r.item]=st[r.item]||{in:0,out:0};st[r.item][r.dir]+=+r.qty||0});return st}
+const gUnit=n=>{const g=D.goodsItems.find(x=>x.name===n);return g?g.unit:'個'};
+function goodsTable(){
+  const st=goodsStock(),ks=Object.keys(st);
+  if(!ks.length)return '<tr><td class="empty">設定で加工品の商品を追加してください</td></tr>';
+  return '<tr><th>商品</th><th>入庫</th><th>出庫</th><th>在庫</th></tr>'+ks.map(k=>{const z=st[k].in-st[k].out;return `<tr><td>${k}</td><td>${st[k].in}</td><td>${st[k].out}</td><td class="${z<0?'neg':''}"><b>${z}</b> ${gUnit(k)}</td></tr>`}).join('');
+}
+function buildGoodsForm(){
+  fillSel($('g-item'),D.goodsItems.map(g=>g.name));
+  if(!$('g-date').value)$('g-date').value=today();
+  $('g-stock').innerHTML=goodsTable();
+}
+$('g-save').onclick=async()=>{
+  const item=$('g-item').value,qty=+$('g-qty').value||0,dir=$('g-dir').value;
+  if(!$('g-date').value)return toast('日付を入力してください');
+  if(!item)return toast('商品を選んでください');
+  if(qty<=0)return toast('数量を入力してください');
+  const rec={id:uid(),date:$('g-date').value,item,dir,qty,memo:$('g-memo').value.trim()};
+  if(!(await send('add',{kind:'goods',record:rec},'記録しました')))return;
+  D.goods.push(rec);$('g-qty').value='';$('g-memo').value='';renderAll();
+};
+function cardG(r){const auto=/^ord_/.test(r.id);return `<div class="card"><div class="hd"><b>${r.dir==='in'?'入庫':'出庫'}　${r.item}</b><span>${r.date}</span></div>
+ <div class="bd"><b>${r.qty}</b> ${gUnit(r.item)}${r.memo?`<br>${r.memo}`:''}</div>
+ ${auto?'<div class="ft" style="color:var(--sub);font-size:12px">注文アプリから自動登録（取り消しは注文アプリ側で）</div>':`<div class="ft"><button class="btn danger" onclick="del('goods','${r.id}')">削除</button></div>`}</div>`}
+function renderGoodsList(){
+  const rows=D.goods.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+  $('g-list').innerHTML=rows.length?rows.map(cardG).join(''):'<div class="empty">まだ記録がありません</div>';
+}
+$('add-goods-btn').onclick=async()=>{
+  const v=$('add-goods').value.trim(),u=$('add-goods-unit').value.trim()||'個';
+  if(!v)return;if(D.goodsItems.some(g=>g.name===v))return toast('すでに登録されています');
+  const next=D.goodsItems.concat([{name:v,unit:u}]);
+  if(!(await send('saveSettings',settingsPayload({goodsItems:next}),'追加しました')))return;
+  D.goodsItems=next;$('add-goods').value='';renderAll();
+};
+function rmGoods(i){confirmBox(`「${D.goodsItems[i].name}」を一覧から外しますか？（過去の記録は残ります）`,async()=>{
+  const next=D.goodsItems.slice();next.splice(i,1);
+  if(!(await send('saveSettings',settingsPayload({goodsItems:next}),'保存しました')))return;
+  D.goodsItems=next;renderAll();
+})}
 
 /* ---- 作業予定 ---- */
 const shiftDate=(d,n)=>{const x=new Date(d+'T00:00:00');x.setDate(x.getDate()+n);return x.toLocaleDateString('sv-SE')};
@@ -837,9 +913,9 @@ $('p-memo').onchange=async()=>{
 function cardH(r){return `<div class="card"><div class="hd"><b>${r.field}</b><span>${r.date}</span></div>
  <div class="bd">${D.sizes.map(s=>`${s} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg${+r.waste?`　／ 廃棄 <b>${fmt(r.waste)}</b> kg`:''}${r.memo?`<br>${r.memo}`:''}</div>
  <div class="ft"><button class="btn danger" onclick="del('harvest','${r.id}')">削除</button></div></div>`}
-function cardS(r){return `<div class="card"><div class="hd"><b>→ ${r.dest}</b><span>${r.date}</span></div>
+function cardS(r){const auto=/^ord_/.test(r.id);return `<div class="card"><div class="hd"><b>→ ${r.dest}</b><span>${r.date}</span></div>
  <div class="bd">${D.sizes.map(s=>`${s} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg${r.price?`　@${r.price}円`:''}${r.memo?`<br>${r.memo}`:''}</div>
- <div class="ft"><button class="btn tiny" onclick="showShipDoc('${r.id}')">納品書</button>　<button class="btn danger" onclick="del('ship','${r.id}')">削除</button></div></div>`}
+ <div class="ft"><button class="btn tiny" onclick="showShipDoc('${r.id}')">納品書</button>　${auto?'<span style="color:var(--sub);font-size:12px">注文アプリから自動登録</span>':`<button class="btn danger" onclick="del('ship','${r.id}')">削除</button>`}</div></div>`}
 function cardB(r){return `<div class="card"><div class="hd"><b>買取 ← ${r.sup}</b><span>${r.date}</span></div>
  <div class="bd">${D.sizes.map(s=>`${s} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg　<b>${yen(buyAmount(r))}</b> 円${+r.waste?`　／ 廃棄 <b>${fmt(r.waste)}</b> kg（支払対象外）`:''}${r.memo?`<br>${r.memo}`:''}</div>
  <div class="ft"><button class="btn tiny" onclick="showDelivery('${r.id}')">納品書</button>　<button class="btn danger" onclick="del('buy','${r.id}')">削除</button></div></div>`}
@@ -877,6 +953,7 @@ function renderStock(){
   const sw={};D.buy.forEach(r=>{sw[r.sup]=(sw[r.sup]||0)+(+r.waste||0)});
   $('st-sup').innerHTML=tbl(grp(D.buy,'sup'),'買取先',sw);
   $('st-dest').innerHTML=tbl(grp(D.ship,'dest'),'出荷先');
+  $('st-goods').innerHTML=goodsTable();
 }
 function renderList(){
   const k=$('l-kind').value,m=$('l-month').value;
@@ -887,14 +964,16 @@ function renderList(){
   if(k==='all'||k==='w')rows=rows.concat(D.peel.map(r=>({...r,k:'w'})));
   if(k==='all'||k==='po')rows=rows.concat(D.peelOut.map(r=>({...r,k:'po'})));
   if(k==='all'||k==='ps')rows=rows.concat(D.peelShip.map(r=>({...r,k:'ps'})));
+  if(k==='all'||k==='g')rows=rows.concat(D.goods.map(r=>({...r,k:'g'})));
   if(m)rows=rows.filter(r=>r.date.startsWith(m));
   rows.sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
-  $('l-body').innerHTML=rows.length?rows.map(r=>r.k==='h'?cardH(r):r.k==='b'?cardB(r):r.k==='w'?cardW(r):r.k==='po'?cardPO(r):r.k==='ps'?cardPS(r):cardS(r)).join(''):'<div class="empty">該当する記録がありません</div>';
+  $('l-body').innerHTML=rows.length?rows.map(r=>r.k==='h'?cardH(r):r.k==='b'?cardB(r):r.k==='w'?cardW(r):r.k==='po'?cardPO(r):r.k==='ps'?cardPS(r):r.k==='g'?cardG(r):cardS(r)).join(''):'<div class="empty">該当する記録がありません</div>';
 }
 $('l-kind').onchange=renderList;$('l-month').onchange=renderList;
 function renderSettings(){
   const chips=(arr,kind)=>arr.map((v,i)=>`<span class="chip">${v}<button title="削除" onclick="rmItem('${kind}',${i})">×</button></span>`).join('')||'<span class="empty">未登録</span>';
   $('c-fields').innerHTML=chips(D.fields,'fields');$('c-sizes').innerHTML=chips(D.sizes,'sizes');$('c-sups').innerHTML=chips(D.sups,'sups');$('c-mems').innerHTML=chips(D.mems,'mems');$('c-workers').innerHTML=chips(D.workers,'workers');$('c-tasks').innerHTML=chips(D.tasks,'tasks');
+  $('c-goods').innerHTML=D.goodsItems.map((g,i)=>`<span class="chip">${g.name}（${g.unit}）<button title="削除" onclick="rmGoods(${i})">×</button></span>`).join('')||'<span class="empty">未登録</span>';
   $('c-prices').innerHTML=D.sizes.map(s=>`<div class="sz"><label>${s}</label><input type="number" min="0" inputmode="numeric" value="${D.prices[s]||''}" placeholder="円/kg" onchange="savePrice('${s}',this.value)"></div>`).join('');
   fillSel($('c-sp-sup'),D.sups);renderSupPrices();
 }
@@ -943,13 +1022,14 @@ $('l-csv').onclick=()=>{
               ...D.ship.map(r=>['出荷',r.date,r.dest,...D.sizes.map(s=>r.q[s]||0),sum(r.q),'',r.price||'',r.price?Math.round(sum(r.q)*r.price):'',r.memo||'']),
               ...D.peel.map(r=>['内職',r.date,r.who,...D.sizes.map(()=>''),fmt(r.good+r.bad),'',`良品${r.gp}/傷${r.bp}`,peelAmt(r),`良品${r.good}kg 傷あり${r.bad}kg ${r.memo||''}`]),
               ...D.peelOut.map(r=>['内職渡し',r.date,r.who,...D.sizes.map(s=>r.q[s]||''),r.kg,'','','',r.memo||'']),
-              ...D.peelShip.map(r=>['渋皮出荷',r.date,r.dest,...D.sizes.map(()=>''),fmt(r.good+r.bad),'',r.price||'',r.price?Math.round((r.good+r.bad)*r.price):'',`良品${r.good}kg 傷あり${r.bad}kg ${r.memo||''}`])];
+              ...D.peelShip.map(r=>['渋皮出荷',r.date,r.dest,...D.sizes.map(()=>''),fmt(r.good+r.bad),'',r.price||'',r.price?Math.round((r.good+r.bad)*r.price):'',`良品${r.good}kg 傷あり${r.bad}kg ${r.memo||''}`]),
+              ...D.goods.map(r=>['加工品'+(r.dir==='in'?'入庫':'出庫'),r.date,r.item,...D.sizes.map(()=>''),r.qty+gUnit(r.item),'','','',r.memo||''])];
   rows.sort((a,b)=>a[1].localeCompare(b[1]));
   dl(`栗収穫管理_${today()}.csv`,[head,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n'),'text/csv');
 };
 $('exp-json').onclick=()=>dl(`kuri-backup_${today()}.json`,JSON.stringify(D,null,1),'application/json');
 $('clear-all').onclick=()=>confirmBox('すべての記録（収穫・出荷・買取・内職・内職渡し・渋皮出荷）を削除します。元に戻せません。',()=>{
-  const n=D.harvest.length+D.ship.length+D.buy.length+D.peel.length+D.peelOut.length+D.peelShip.length;
+  const n=D.harvest.length+D.ship.length+D.buy.length+D.peel.length+D.peelOut.length+D.peelShip.length+D.goods.length;
   if(!n)return toast('削除する記録がありません');
   confirmBox(`本当によろしいですか？　記録 ${n} 件をスプレッドシートから削除します。（設定・作業予定は残ります）`,deleteAllRecords);
 });
@@ -957,7 +1037,7 @@ async function deleteAllRecords(){
   if(busy)return;
   if(!apiReady())return toast('API_URL が未設定です');
   const jobs=[];
-  ['harvest','ship','buy','peel','peelOut','peelShip'].forEach(k=>D[k].forEach(r=>jobs.push({kind:k,id:r.id})));
+  ['harvest','ship','buy','peel','peelOut','peelShip','goods'].forEach(k=>D[k].forEach(r=>jobs.push({kind:k,id:r.id})));
   if(!jobs.length)return toast('削除する記録がありません');
   setBusy(true);
   let ng=0;
@@ -970,7 +1050,7 @@ async function deleteAllRecords(){
   toast(ng?'削除できませんでした。通信を確認してください':'削除しました');
 }
 
-function renderAll(){buildForms();buildPeelForm();renderToday();renderBuyList();renderPeelList();renderPeelOut();renderPeelShipList();renderPlan();renderStock();renderList();renderSettings()}
+function renderAll(){buildForms();buildPeelForm();buildGoodsForm();renderToday();renderBuyList();renderPeelList();renderPeelOut();renderPeelShipList();renderGoodsList();renderPlan();renderStock();renderList();renderSettings()}
 renderAll();
 boot();
 </script>

@@ -16,14 +16,16 @@
  *   POST {action:'add',          kind:'harvest'|'ship'|'buy'|'peel'|'peelOut'|'peelShip', record:{...}}
  *   POST {action:'delete',       kind:同上, id:'...'}
  *   POST {action:'saveSettings', fields?, sizes?, sups?, mems?, tasks?,
- *                                workers?, prices?, peelPrice?, supPrices?, schedule?}
+ *                                workers?, prices?, peelPrice?, supPrices?, goodsItems?, orderMap?, schedule?}
+ *   POST {action:'orderShip',   orderId, date, dest, lines:[{name,qty}], memo}   ← 注文発送管理アプリから
+ *   POST {action:'orderCancel', orderId}
  *
  * 応答はすべて {ok:true, data:...} / {ok:false, error:'...'}
  */
 
 var SPREADSHEET_ID = '';                       // 空ならアクティブなスプレッドシート
 var SETTING_SHEET  = '設定';
-var SHEETS = { harvest: '収穫', ship: '出荷', buy: '買取', peel: '内職', peelOut: '内職渡し', peelShip: '渋皮出荷' };
+var SHEETS = { harvest: '収穫', ship: '出荷', buy: '買取', peel: '内職', peelOut: '内職渡し', peelShip: '渋皮出荷', goods: '加工品' };
 
 var DEFAULTS = {
   fields:    ['今中', '段宿'],
@@ -35,11 +37,35 @@ var DEFAULTS = {
   prices:    { '3L以上': 1700, '2L': 1500, 'L': 1100, 'M': 700 },
   peelPrice: { good: 1500, bad: 300 },
   supPrices: { '荻野運送': { '3L以上': 2300, '2L': 1800, 'L': 1400 } },
+  goodsItems: [
+    { name: '丹波栗ペースト 500g', unit: 'パック' },
+    { name: '丹波栗ペースト 1kg', unit: 'パック' },
+    { name: '丹波栗ペースト 2kg', unit: 'パック' },
+    { name: '丹波栗 ボイルドマロン 1kg', unit: 'パック' },
+    { name: '丹波栗渋皮煮 1号缶（固形物1.9kg）', unit: '缶' },
+    { name: '丹波栗 甘露煮 1号缶（固形物1.9kg）', unit: '缶' }
+  ],
+  // 注文発送管理アプリの商品名 → 栗在庫の対応（kind: ship=生栗 / peelShip=渋皮むき栗 / goods=加工品）
+  orderMap: {
+    '丹波栗 生栗 3L': { kind: 'ship', size: '3L以上' },
+    '丹波栗 生栗 4L': { kind: 'ship', size: '3L以上' },
+    '丹波栗 生栗 2L': { kind: 'ship', size: '2L' },
+    '丹波栗 生栗 L':  { kind: 'ship', size: 'L' },
+    '丹波栗 3L 鬼皮剥き栗（渋皮残し）': { kind: 'peelShip', field: 'good' },
+    '丹波栗 3L 鬼皮剥き栗（渋皮傷入り）': { kind: 'peelShip', field: 'bad' },
+    '丹波栗ペースト 500g': { kind: 'goods' },
+    '丹波栗ペースト 1kg':  { kind: 'goods' },
+    '丹波栗ペースト 2kg':  { kind: 'goods' },
+    '丹波栗 ボイルドマロン 1kg': { kind: 'goods' },
+    '丹波栗渋皮煮 1号缶（固形物1.9kg）': { kind: 'goods' },
+    '丹波栗 甘露煮 1号缶（固形物1.9kg）': { kind: 'goods' }
+  },
   schedule:  {}
 };
 
 var ARR_KEYS = ['fields', 'sizes', 'sups', 'mems', 'tasks', 'workers'];
-var OBJ_KEYS = ['prices', 'peelPrice', 'supPrices', 'schedule'];
+var OBJ_KEYS = ['prices', 'peelPrice', 'supPrices', 'orderMap', 'schedule'];
+var LIST_KEYS = ['goodsItems'];   // オブジェクト配列の設定
 
 /* ===================== エントリポイント ===================== */
 
@@ -64,6 +90,8 @@ function doPost(e) {
     if (action === 'delete')       return json({ ok: true, data: deleteRecord(body.kind, body.id) });
     if (action === 'saveSettings') return json({ ok: true, data: saveSettings(body) });
     if (action === 'getAll')       return json({ ok: true, data: getAll() });
+    if (action === 'orderShip')    return json({ ok: true, data: orderShip(body) });
+    if (action === 'orderCancel')  return json({ ok: true, data: orderCancel(body.orderId) });
 
     return json({ ok: false, error: 'unknown action: ' + action });
   } catch (err) {
@@ -98,13 +126,16 @@ function getAll() {
     prices:    st.prices,
     peelPrice: st.peelPrice,
     supPrices: st.supPrices,
+    goodsItems: st.goodsItems,
+    orderMap:  st.orderMap,
     schedule:  st.schedule,
     harvest:   readRecords(ss, 'harvest', st.sizes),
     ship:      readRecords(ss, 'ship',    st.sizes),
     buy:       readRecords(ss, 'buy',     st.sizes),
     peel:      readRecords(ss, 'peel',    st.sizes),
     peelOut:   readRecords(ss, 'peelOut', st.sizes),
-    peelShip:  readRecords(ss, 'peelShip',st.sizes)
+    peelShip:  readRecords(ss, 'peelShip',st.sizes),
+    goods:     readRecords(ss, 'goods',   st.sizes)
   };
 }
 
@@ -115,7 +146,7 @@ function addRecord(kind, rec) {
   var ss = ss_();
   var st = readSettings(ss);
   // 設定にないサイズがレコードに含まれていても取りこぼさない（peelは無関係）
-  var sizes = (kind === 'peel' || kind === 'peelShip')
+  var sizes = (kind === 'peel' || kind === 'peelShip' || kind === 'goods')
     ? st.sizes
     : unique(st.sizes.concat(Object.keys(rec.q || {})));
 
@@ -162,8 +193,75 @@ function saveSettings(body) {
     st[k] = (body[k] && typeof body[k] === 'object' && !Array.isArray(body[k]))
               ? body[k] : cur[k];
   });
+  LIST_KEYS.forEach(function (k) {
+    st[k] = Array.isArray(body[k]) ? body[k] : cur[k];
+  });
   writeSettings(sheet_(ss, SETTING_SHEET, ['key', 'value']), st);
   return st;
+}
+
+/* ===================== 注文発送管理アプリからの連携 ===================== */
+
+/**
+ * 注文が「発送済」になったときに呼ばれる。
+ * body: { orderId, date, dest, lines:[{name, qty, unit}], memo }
+ * 同じ orderId の既存レコードを消してから登録し直すので、何度呼んでも二重にならない。
+ */
+function orderShip(body) {
+  var orderId = String(body.orderId || '').trim();
+  if (!orderId) throw new Error('orderId が必要です');
+  var st   = readSettings(ss_());
+  var map  = st.orderMap || {};
+  var date = String(body.date || Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd'));
+  var dest = String(body.dest || '');
+  var memo = '注文No.' + orderId + '（自動）' + (body.memo ? ' ' + body.memo : '');
+  var pre  = 'ord_' + orderId + '_';
+
+  var removed = orderCancel(orderId).deleted;
+
+  var q = {}, peel = { good: 0, bad: 0 }, goods = [], unknown = [];
+  (body.lines || []).forEach(function (l) {
+    var name = String(l.name || '').trim(), qty = num(l.qty);
+    if (!name || qty <= 0) return;
+    var m = map[name];
+    if (!m) { if (name !== '送料') unknown.push(name); return; }
+    if (m.kind === 'ship')          q[m.size] = (q[m.size] || 0) + qty;
+    else if (m.kind === 'peelShip') peel[m.field === 'bad' ? 'bad' : 'good'] += qty;
+    else if (m.kind === 'goods')    goods.push({ item: m.item || name, qty: qty });
+  });
+
+  var added = [];
+  if (Object.keys(q).length) {
+    addRecord('ship', { id: pre + 'ship', date: date, dest: dest, q: q, price: null, memo: memo });
+    added.push('ship');
+  }
+  if (peel.good > 0 || peel.bad > 0) {
+    addRecord('peelShip', { id: pre + 'peel', date: date, dest: dest, good: peel.good, bad: peel.bad, price: null, memo: memo });
+    added.push('peelShip');
+  }
+  goods.forEach(function (g, i) {
+    addRecord('goods', { id: pre + 'g' + i, date: date, item: g.item, dir: 'out', qty: g.qty, memo: memo + ' → ' + dest });
+    added.push('goods:' + g.item);
+  });
+  return { orderId: orderId, removed: removed, added: added, unknown: unknown };
+}
+
+/** 注文の取消・発送済の取り下げ・削除時に呼ばれる。orderId に紐づくレコードを全部消す */
+function orderCancel(orderId) {
+  orderId = String(orderId || '').trim();
+  if (!orderId) throw new Error('orderId が必要です');
+  var pre = 'ord_' + orderId + '_', ss = ss_(), deleted = 0;
+  ['ship', 'peelShip', 'goods'].forEach(function (kind) {
+    var sh = ss.getSheetByName(SHEETS[kind]);
+    if (!sh || sh.getLastRow() < 2) return;
+    var vals = sh.getDataRange().getValues();
+    var i = headRow(vals[0]).indexOf('id');
+    if (i < 0) return;
+    for (var r = vals.length - 1; r >= 1; r--) {
+      if (String(vals[r][i]).indexOf(pre) === 0) { sh.deleteRow(r + 1); deleted++; }
+    }
+  });
+  return { orderId: orderId, deleted: deleted };
 }
 
 /* ===================== シート入出力 ===================== */
@@ -183,6 +281,9 @@ function headersFor(kind, sizes) {
   }
   if (kind === 'peelShip') {
     return ['id', '日付', '出荷先', '良品kg', '傷ありkg', '合計kg', '単価', '金額', 'メモ', '登録日時'];
+  }
+  if (kind === 'goods') {
+    return ['id', '日付', '商品', '区分', '数量', 'メモ', '登録日時'];
   }
   return ['id', '日付', '買取先']
     .concat(sizes.map(function (s) { return s + '_kg'; }))
@@ -213,6 +314,12 @@ function buildRowMap(kind, rec, sizes) {
     m['作業者'] = String(rec.who || '');
     sizes.forEach(function (s) { var w = num(oq[s]); m[s] = w; ot += w; });
     m['kg']     = ot > 0 ? Math.round(ot * 10) / 10 : num(rec.kg);
+    return m;
+  }
+  if (kind === 'goods') {
+    m['商品'] = String(rec.item || '');
+    m['区分'] = rec.dir === 'out' ? '出庫' : '入庫';
+    m['数量'] = num(rec.qty);
     return m;
   }
   if (kind === 'peelShip') {
@@ -294,6 +401,13 @@ function readRecords(ss, kind, sizes) {
       out.push(rec);
       continue;
     }
+    if (kind === 'goods') {
+      rec.item = String(col(row, '商品') || '');
+      rec.dir  = String(col(row, '区分') || '') === '出庫' ? 'out' : 'in';
+      rec.qty  = num(col(row, '数量'));
+      out.push(rec);
+      continue;
+    }
     if (kind === 'peelShip') {
       rec.dest = String(col(row, '出荷先') || '');
       rec.good = num(col(row, '良品kg'));
@@ -347,13 +461,16 @@ function readSettings(ss) {
     st[k] = (raw[k] && typeof raw[k] === 'object' && !Array.isArray(raw[k]))
               ? raw[k] : copy(DEFAULTS[k]);
   });
+  LIST_KEYS.forEach(function (k) {
+    st[k] = (Array.isArray(raw[k]) && raw[k].length) ? raw[k] : copy(DEFAULTS[k]);
+  });
 
   if (vals.length < 2) writeSettings(sh, st);   // 初回は既定値を書き込む
   return st;
 }
 
 function writeSettings(sh, st) {
-  var rows = ARR_KEYS.concat(OBJ_KEYS).map(function (k) {
+  var rows = ARR_KEYS.concat(OBJ_KEYS).concat(LIST_KEYS).map(function (k) {
     return [k, JSON.stringify(st[k])];
   });
   var last = sh.getLastRow();

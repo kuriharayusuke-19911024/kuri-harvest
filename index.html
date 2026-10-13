@@ -289,7 +289,6 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
     <div><small>廃棄累計</small><b id="st-w" style="font-size:15px">自社 0<i>kg</i>／買取 0<i>kg</i></b></div>
   </div>
   <div class="tw"><table id="st-table"></table></div>
-  <p class="note" style="margin-top:6px">内職に渡した生栗はサイズを問わないため、サイズ別の表には含めず「生栗 在庫」の合計から引いています。</p>
   <h3>渋皮むき栗（内職）</h3>
   <div class="sum" style="grid-template-columns:repeat(auto-fit,minmax(100px,1fr))">
     <div><small>良品 入庫</small><b id="sp-gin">0<i>kg</i></b></div>
@@ -861,11 +860,12 @@ function renderBuyList(){
 function renderStock(){
   const z=stock();let th=0,ts=0,tb=0;
   D.sizes.forEach(s=>{th+=z[s].h;tb+=z[s].b;ts+=z[s].s});
-  const row=(label,f)=>{let t=0;return `<tr><td><b>${label}</b></td>`+D.sizes.map(s=>{const n=f(z[s]);t+=n;return `<td class="${n<0?'neg':''}">${fmt(n)}</td>`}).join('')+`<td><b>${fmt(t)}</b></td></tr>`};
-  let html=`<tr><th>サイズ</th>${D.sizes.map(s=>`<th>${s}</th>`).join('')}<th>合計</th></tr>`+row('自社分',c=>c.h-c.s);
-  if(D.buy.length)html+=row('買取分',c=>c.b);
+  const row=(label,f)=>{let t=0;const st=label==='在庫'?' style="background:var(--soft)"':'';return `<tr${st}><td><b>${label}</b></td>`+D.sizes.map(s=>{const n=f(z[s]);t+=n;return `<td class="${n<0?'neg':''}">${fmt(n)}</td>`}).join('')+`<td><b>${fmt(t)}</b></td></tr>`};
+  let html=`<tr><th>サイズ</th>${D.sizes.map(s=>`<th>${s}</th>`).join('')}<th>合計</th></tr>`+row('収穫',c=>c.h);
+  if(D.buy.length)html+=row('買取',c=>c.b);
+  html+=row('出荷',c=>c.s?-c.s:0);
   if(D.peelOut.length)html+=row('内職渡し',c=>c.o?-c.o:0);
-  html+=row('在庫合計',c=>c.h+c.b-c.s-c.o);
+  html+=row('在庫',c=>c.h+c.b-c.s-c.o);
   const unsz=peelOutUnsized();if(unsz)html+=`<tr><td colspan="${D.sizes.length+2}" style="text-align:left;color:var(--sub);font-size:12px">※サイズ未指定の内職渡し ${fmt(unsz)}kg は合計のみから引いています</td></tr>`;
   const tw=D.harvest.reduce((a,r)=>a+(+r.waste||0),0),tbw=D.buy.reduce((a,r)=>a+(+r.waste||0),0);
   $('st-table').innerHTML=html;$('st-h').innerHTML=fmt(th)+'<i>kg</i>';$('st-s').innerHTML=fmt(ts)+'<i>kg</i>';$('st-b').innerHTML=fmt(tb)+'<i>kg</i>';const tpo=peelOutTotal();$('st-po').innerHTML=fmt(tpo)+'<i>kg</i>';$('st-z').innerHTML=fmt(rawStockTotal())+'<i>kg</i>';

@@ -70,13 +70,17 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
 
 .print-only{display:none}
 @media print{
-  body *{visibility:hidden}
-  #doc,#doc *{visibility:visible}
-  #docmodal{position:static;background:none;padding:0;overflow:visible}
-  #docmodal .dm-box{max-width:none;padding:0;border-radius:0;box-shadow:none}
+  @page{size:A4;margin:15mm 12mm}
+  body>*:not(#docmodal){display:none!important}
+  html,body{background:#fff;height:auto;overflow:visible}
+  #docmodal{position:static;background:none;padding:0;overflow:visible;inset:auto}
+  #docmodal .dm-box{max-width:none;padding:0;border-radius:0;box-shadow:none;margin:0}
   #docmodal .dm-bar{display:none}
   #docmodal .docwrap{border:0;border-radius:0;padding:0;margin:0;overflow:visible}
-  #doc{position:absolute;left:0;top:0;width:100%;padding:20mm 15mm}
+  #doc{position:static;width:auto;padding:0}
+  #doc table{page-break-inside:auto}
+  #doc tr{page-break-inside:avoid}
+  #doc thead{display:table-header-group}
 }
 #doc{font-size:13px;color:#000}
 #doc h1{font-size:22px;text-align:center;letter-spacing:.3em;margin:0 0 20px;border-bottom:2px solid #000;padding-bottom:6px}

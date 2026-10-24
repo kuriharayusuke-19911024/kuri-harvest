@@ -642,6 +642,15 @@ function docTable(rows,withDate){
    <tr><td colspan="${withDate?2:1}" style="text-align:right"><b>合計</b></td><td><b>${fmt(kg)}</b></td><td></td><td><b>${yen(total)}</b></td></tr></table>`;
   return {html,total,kg};
 }
+function sizeSummary(rows){
+  const agg={};rows.forEach(r=>D.sizes.forEach(s=>{const w=+r.q[s]||0;if(!w)return;const a=agg[s]||(agg[s]={kg:0,amt:0,prices:{}});a.kg+=w;a.amt+=w*(+r.p[s]||0);a.prices[+r.p[s]||0]=1}));
+  const ks=D.sizes.filter(s=>agg[s]);if(!ks.length)return '';
+  let tk=0,ta=0;
+  const lines=ks.map(s=>{const a=agg[s];tk+=a.kg;ta+=a.amt;const pr=Object.keys(a.prices).map(Number);const pt=pr.length===1?yen(pr[0]):pr.map(yen).join('／');return `<tr><td>${s}</td><td>${fmt(a.kg)}</td><td>${pt}</td><td>${yen(a.amt)}</td></tr>`}).join('');
+  return `<div style="margin-top:16px;font-weight:700">サイズ別 合計</div>
+   <table><tr><th>サイズ</th><th>重量(kg)</th><th>単価(円/kg)</th><th>金額(円)</th></tr>${lines}
+   <tr><td style="text-align:right"><b>合計</b></td><td><b>${fmt(tk)}</b></td><td></td><td><b>${yen(ta)}</b></td></tr></table>`;
+}
 const wasteBox=w=>+w?`<div style="display:inline-block;border:1px solid #000;padding:6px 12px;margin:4px 0">廃棄　${fmt(w)} kg（支払対象外）</div>`:'';
 const jd=d=>{const [y,m,dd]=d.split('-');return `${y}年${+m}月${+dd}日`};
 /* ---- 納品書（都度） ---- */
@@ -688,6 +697,7 @@ $('d-make').onclick=()=>{
   showDoc(docHead('買取明細書',sup,`<div style="margin-top:6px">対象期間：${jd(rows[0].date)} 〜 ${jd(rows[rows.length-1].date)}（${rows.length}回）</div><div>発行日：${jd(today())}</div>${pay?`<div>お支払予定：${pay}</div>`:''}`)+
    `<p>下記のとおり買取いたしましたので、お支払内容をご通知申し上げます。</p>
     <div class="grand">お支払金額　${yen(t.total)} 円<small>（内消費税等 8%：${yen(tax)} 円）</small></div>${t.html}${wasteBox(tw)}
+    ${sizeSummary(rows)}
     <div class="foot">※単価・金額は税込（軽減税率8%対象）です。</div>`,
    `買取明細書_${sup}_${today()}`);
 };

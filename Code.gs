@@ -19,6 +19,8 @@
  *                                workers?, prices?, peelPrice?, supPrices?, goodsItems?, orderMap?, schedule?}
  *   POST {action:'orderShip',   orderId, date, dest, lines:[{name,qty}], memo}   ← 注文発送管理アプリから
  *   POST {action:'orderCancel', orderId}
+ *   商品名は設定 orderMap で対応づけ。無い名前は guessLine_ で言葉から推定し、
+ *   それでも分からないものは「連携ログ」シートに残り、画面上部に注意が出る。
  *
  * 応答はすべて {ok:true, data:...} / {ok:false, error:'...'}
  */
@@ -26,6 +28,7 @@
 var SPREADSHEET_ID = '';                       // 空ならアクティブなスプレッドシート
 var SETTING_SHEET  = '設定';
 var SHEETS = { harvest: '収穫', ship: '出荷', buy: '買取', peel: '内職', peelOut: '内職渡し', peelShip: '渋皮出荷', goods: '加工品' };
+var LOG_SHEET = '連携ログ';   // 注文発送管理アプリからの自動連携の記録（対応づけできなかった商品名もここに残る）
 
 var DEFAULTS = {
   fields:    ['今中', '段宿'],
@@ -135,7 +138,8 @@ function getAll() {
     peel:      readRecords(ss, 'peel',    st.sizes),
     peelOut:   readRecords(ss, 'peelOut', st.sizes),
     peelShip:  readRecords(ss, 'peelShip',st.sizes),
-    goods:     readRecords(ss, 'goods',   st.sizes)
+    goods:     readRecords(ss, 'goods',   st.sizes),
+    syncLog:   readSyncLog(ss)
   };
 }
 
@@ -196,8 +200,25 @@ function saveSettings(body) {
   LIST_KEYS.forEach(function (k) {
     st[k] = Array.isArray(body[k]) ? body[k] : cur[k];
   });
+  st.schedule = pruneSchedule_(st.schedule);
   writeSettings(sheet_(ss, SETTING_SHEET, ['key', 'value']), st);
   return st;
+}
+
+/** 作業予定は1セルにJSONで保存するため（上限5万文字）、空の日と2年以上前の日を落として肥大化を防ぐ */
+function pruneSchedule_(sc) {
+  if (!sc || typeof sc !== 'object') return {};
+  var out = {}, limit = Utilities.formatDate(new Date(Date.now() - 2 * 366 * 86400000), tz_(), 'yyyy-MM-dd');
+  Object.keys(sc).forEach(function (d) {
+    var r = sc[d];
+    if (!r || typeof r !== 'object') return;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d) && d < limit) return;
+    var a = r.a && typeof r.a === 'object' ? r.a : {};
+    var has = !!(r.memo && String(r.memo).trim());
+    Object.keys(a).forEach(function (t) { if (Array.isArray(a[t]) && a[t].length) has = true; });
+    if (has) out[d] = r;
+  });
+  return out;
 }
 
 /* ===================== 注文発送管理アプリからの連携 ===================== */
@@ -223,8 +244,8 @@ function orderShip(body) {
   (body.lines || []).forEach(function (l) {
     var name = String(l.name || '').trim(), qty = num(l.qty);
     if (!name || qty <= 0) return;
-    var m = map[name];
-    if (!m) { if (name !== '送料') unknown.push(name); return; }
+    var m = map[name] || guessLine_(name, st);
+    if (!m) { if (!/送料|運賃|手数料/.test(name)) unknown.push(name); return; }
     if (m.kind === 'ship')          q[m.size] = (q[m.size] || 0) + qty;
     else if (m.kind === 'peelShip') peel[m.field === 'bad' ? 'bad' : 'good'] += qty;
     else if (m.kind === 'goods')    goods.push({ item: m.item || name, qty: qty });
@@ -243,7 +264,89 @@ function orderShip(body) {
     addRecord('goods', { id: pre + 'g' + i, date: date, item: g.item, dir: 'out', qty: g.qty, memo: memo + ' → ' + dest });
     added.push('goods:' + g.item);
   });
+  writeSyncLog_(ss_(), orderId, dest, added, unknown);
   return { orderId: orderId, removed: removed, added: added, unknown: unknown };
+}
+
+/**
+ * 商品名が orderMap に無いとき、名前の中の言葉から在庫の種類を推定する。
+ * 注文アプリでは商品名を自由入力できるため（例：「P420000 生栗 2Lサイズ」「丹波栗　3L」）、
+ * 明らかなものだけ拾い、迷うものは unknown にして「連携ログ」と画面の注意表示に残す。
+ */
+function guessLine_(name, st) {
+  var n = String(name).replace(/[\s　]+/g, '').replace(/[Ａ-Ｚａ-ｚ０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).toUpperCase();
+  n = n.replace(/^P\d{5,}/, '');                    // 商品コード（P420000 など）を外す
+
+  // 加工品：登録済みの商品名と「ペースト＋容量」などで照合
+  var items = st.goodsItems || [];
+  for (var i = 0; i < items.length; i++) {
+    var gn = String(items[i].name).replace(/[\s　]+/g, '').toUpperCase();
+    if (n === gn) return { kind: 'goods', item: items[i].name };
+  }
+  if (/ペースト/.test(n)) {
+    var cap = (n.match(/(\d+(?:\.\d+)?)(KG|G)/) || [])[0];
+    if (cap) {
+      for (var j = 0; j < items.length; j++) {
+        var gj = String(items[j].name).replace(/[\s　]+/g, '').toUpperCase();
+        if (/ペースト/.test(gj) && gj.indexOf(cap) >= 0) return { kind: 'goods', item: items[j].name };
+      }
+    }
+    return null;   // 容量不明のペーストは判断しない
+  }
+  if (/渋皮煮|甘露煮|ボイルドマロン/.test(n)) {
+    var kw = /渋皮煮/.test(n) ? '渋皮煮' : /甘露煮/.test(n) ? '甘露煮' : 'ボイルドマロン';
+    if (/瓶|小瓶|ビン/.test(n)) return null;           // 瓶詰は在庫管理の対象外（判断しない）
+    if (kw === 'ボイルドマロン' || /1号|１号|一号/.test(n)) {
+      for (var k = 0; k < items.length; k++) {
+        var gk = String(items[k].name);
+        if (gk.indexOf(kw) >= 0 && (kw === 'ボイルドマロン' || /1号/.test(gk))) return { kind: 'goods', item: gk };
+      }
+    }
+    return null;
+  }
+
+  // 渋皮むき栗（鬼皮剥き）
+  if (/鬼皮|むき栗|剥き栗|剝き栗/.test(n) && !/渋皮煮/.test(n)) {
+    return { kind: 'peelShip', field: /傷/.test(n) ? 'bad' : 'good' };
+  }
+
+  // 生栗：サイズ表記があるもの（殻付き・渋皮付・皮付き・生栗・熟成栗 もすべて生栗の在庫から出る）
+  var sz = n.match(/(^|[^0-9A-Z])([2-5]L|L|M)(?![A-Z])/);
+  if (sz && !/ペースト|煮|瓶|缶/.test(n)) {
+    var size = sz[2];
+    var sizes = st.sizes || [];
+    if (/^[3-5]L$/.test(size)) {                       // 3L・4L・5L は「3L以上」へ
+      for (var a = 0; a < sizes.length; a++) if (/^3L/.test(sizes[a])) return { kind: 'ship', size: sizes[a] };
+    }
+    if (sizes.indexOf(size) >= 0) return { kind: 'ship', size: size };
+  }
+  return null;
+}
+
+function writeSyncLog_(ss, orderId, dest, added, unknown) {
+  var sh = sheet_(ss, LOG_SHEET, ['日時', '注文ID', '出荷先', '登録した在庫', '対応づけできなかった商品名']);
+  // 同じ注文IDの古い行は消して最新だけ残す（名前を直して再登録したら注意表示も消えるように）
+  var vals = sh.getDataRange().getValues();
+  for (var r = vals.length - 1; r >= 1; r--) if (String(vals[r][1]) === orderId) sh.deleteRow(r + 1);
+  sh.appendRow([Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd HH:mm:ss'), orderId, dest, added.join(', '), unknown.join(', ')]);
+  var last = sh.getLastRow();
+  if (last > 501) sh.deleteRows(2, last - 501);        // 直近500件だけ残す
+}
+
+/** 対応づけできなかった商品名がある連携だけ、直近90日分を返す（画面の注意表示に使う） */
+function readSyncLog(ss) {
+  var sh = ss.getSheetByName(LOG_SHEET);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var vals = sh.getDataRange().getValues(), out = [];
+  var limit = new Date(Date.now() - 90 * 86400000);
+  for (var r = 1; r < vals.length; r++) {
+    var un = String(vals[r][4] || '').trim();
+    if (!un) continue;
+    var at = vals[r][0] instanceof Date ? vals[r][0] : new Date(String(vals[r][0]));
+    if (isFinite(at) && at < limit) continue;
+    out.push({ at: dstr(vals[r][0]), orderId: String(vals[r][1]), dest: String(vals[r][2] || ''), unknown: un.split(/,\s*/) });
+  }
+  return out;
 }
 
 /** 注文の取消・発送済の取り下げ・削除時に呼ばれる。orderId に紐づくレコードを全部消す */

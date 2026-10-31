@@ -118,7 +118,8 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
 </head>
 <body>
 <header>
-  <h1>丹波栗 収穫管理<small>株式会社丹波農商</small></h1>
+  <h1 style="display:flex;align-items:baseline;gap:8px"><span>丹波栗 収穫管理<small>株式会社丹波農商</small></span><span style="flex:1"></span><button class="btn tiny" id="reload" title="最新のデータを読み込む" style="font-size:12px;padding:4px 10px">↻ 更新</button></h1>
+  <div id="sync-warn" class="note" style="display:none;margin:0 0 10px;background:#fdf1ec;color:var(--red)"></div>
   <nav>
     <button class="on" data-tab="harvest">収穫記録</button>
     <button data-tab="ship">出荷記録</button>
@@ -385,7 +386,7 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
     <button class="btn sub" id="exp-json">バックアップ（JSON）</button>
     <button class="btn danger" id="clear-all">全データ削除</button>
   </div>
-  <p class="note">データはGoogleスプレッドシート「栗収穫管理」に保存され、3人で同じ内容を共有します。「全データ削除」は記録（収穫・出荷・買取・内職・内職渡し・渋皮出荷）だけを消し、設定と作業予定・シート自体は残ります。</p>
+  <p class="note">データはGoogleスプレッドシート「栗収穫管理」に保存され、3人で同じ内容を共有します。「全データ削除」は記録（収穫・出荷・買取・内職・内職渡し・渋皮出荷・加工品）だけを消し、設定と作業予定・シート自体は残ります。</p>
 </section>
 </main>
 
@@ -430,14 +431,16 @@ const fmt=n=>(Math.round(n*10)/10).toLocaleString();
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const CO={name:'株式会社丹波農商',zip:'〒669-4311',addr:'兵庫県丹波市市島町上竹田915-5',tel:'TEL 050-8890-8987',inv:'登録番号 T5140001115497'};
 const yen=n=>Math.round(n).toLocaleString();
-const sum=o=>Object.values(o).reduce((a,b)=>a+(+b||0),0);
+const sum=o=>Object.values(o||{}).reduce((a,b)=>a+(+b||0),0);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const EPS=1e-6;   // 小数の誤差（0.1+0.2 など）で誤って「在庫超過」と出ないように
 
 /* ---- toast / modal ---- */
 let tt;function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),1800)}
 let onOk=null;
-function confirmBox(msg,cb){$('modal-msg').textContent=msg;onOk=cb;$('modal').hidden=false}
-$('modal-no').onclick=()=>{$('modal').hidden=true};
-$('modal-ok').onclick=()=>{$('modal').hidden=true;onOk&&onOk()};
+function confirmBox(msg,cb,okLabel){$('modal-msg').textContent=msg;onOk=cb;$('modal-ok').textContent=okLabel||'削除する';$('modal').hidden=false}
+$('modal-no').onclick=()=>{$('modal').hidden=true;onOk=null};
+$('modal-ok').onclick=()=>{$('modal').hidden=true;const f=onOk;onOk=null;f&&f()};
 
 /* ---- GAS 通信 ---- */
 let busy=false;
@@ -457,24 +460,21 @@ async function send(action,payload,okMsg){
   if(!apiReady()){toast('API_URL が未設定です');return false}
   setBusy(true);toast('保存中…');
   try{await apiPost(action,payload);if(okMsg)toast(okMsg);return true}
-  catch(e){toast('保存できませんでした。通信を確認してください');return false}
+  catch(e){toast('保存できませんでした。通信を確認してください'+(e&&e.message&&e.message!=='通信エラー'?'（'+e.message+'）':''));return false}
   finally{setBusy(false)}
 }
-function settingsPayload(over){
-  return Object.assign({
-    fields:D.fields,sizes:D.sizes,sups:D.sups,
-    mems:D.mems,tasks:D.tasks,workers:D.workers,
-    prices:D.prices,peelPrice:D.peelPrice,supPrices:D.supPrices,goodsItems:D.goodsItems
-  },over||{});
-}
+/* 変更した設定だけを送る（他の人が同時に変えた設定を、古い手元のデータで上書きしないため。
+   サーバー側は送られなかった項目を現状維持する） */
+function settingsPayload(over){return Object.assign({},over||{})}
 function normalize(d){
   const o=Object.assign(JSON.parse(JSON.stringify(DEF)),d||{});
   ['fields','sizes','sups','mems','tasks','workers'].forEach(k=>{if(!Array.isArray(o[k]))o[k]=DEF[k].slice()});
   ['prices','peelPrice','schedule','supPrices'].forEach(k=>{if(!o[k]||typeof o[k]!=='object'||Array.isArray(o[k]))o[k]=JSON.parse(JSON.stringify(DEF[k]))});
   ['harvest','ship','buy'].forEach(k=>{
     o[k]=Array.isArray(o[k])?o[k]:[];
-    o[k].forEach(r=>{if(!r.q||typeof r.q!=='object')r.q={};if(k==='buy'&&(!r.p||typeof r.p!=='object'))r.p={};if(r.memo==null)r.memo='';if(k!=='ship')r.waste=+r.waste||0});
+    o[k].forEach(r=>{if(!r.q||typeof r.q!=='object')r.q={};if(k==='buy'&&(!r.p||typeof r.p!=='object'))r.p={};if(r.memo==null)r.memo='';if(k!=='ship')r.waste=+r.waste||0;if(k==='ship'){if(r.dest==null)r.dest='';if(r.price===''||r.price===undefined)r.price=null}});
   });
+  o.syncLog=Array.isArray(o.syncLog)?o.syncLog:[];
   o.peel=Array.isArray(o.peel)?o.peel:[];
   o.peel.forEach(r=>{if(r.memo==null)r.memo='';['good','bad','gp','bp'].forEach(k=>{if(r[k]==null)r[k]=0})});
   o.peelOut=Array.isArray(o.peelOut)?o.peelOut:[];
@@ -487,19 +487,25 @@ function normalize(d){
   o.goods.forEach(r=>{if(r.memo==null)r.memo='';r.qty=+r.qty||0;r.dir=r.dir==='out'?'out':'in';if(r.item==null)r.item=''});
   return o;
 }
-async function boot(){
+let lastLoad=0;
+async function boot(quiet){
   if(!apiReady())return toast('API_URL を設定してください');
-  setBusy(true);toast('読み込み中…');
-  try{D=normalize(await apiGet());renderAll()}
+  if(busy)return;
+  setBusy(true);if(!quiet)toast('読み込み中…');
+  try{D=normalize(await apiGet());lastLoad=Date.now();renderAll();if(quiet)toast('最新のデータに更新しました')}
   catch(e){toast('読み込めませんでした。通信を確認してください')}
   finally{setBusy(false)}
 }
+/* 3人で同時に使う／注文アプリから自動登録されるので、古い表示のままにならないように再読込する */
+$('reload').onclick=()=>boot(true);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&Date.now()-lastLoad>60*1000)boot(true)});
 
 /* ---- tabs ---- */
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
   document.querySelectorAll('main section').forEach(s=>s.hidden=s.id!=='tab-'+b.dataset.tab);
   renderAll();
+  if(['stock','list','goods','peel'].includes(b.dataset.tab)&&Date.now()-lastLoad>60*1000)boot(true);
 });
 
 /* ---- 在庫計算 ---- */
@@ -519,24 +525,29 @@ function peelStock(){
 }
 
 /* ---- フォーム構築 ---- */
-function fillSel(el,arr){const cur=el.value;el.innerHTML=arr.map(v=>`<option>${v}</option>`).join('');if(arr.includes(cur))el.value=cur}
+function fillSel(el,arr){const cur=el.value;el.innerHTML=arr.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');if(arr.includes(cur))el.value=cur}
+/* 入力途中の値を保持したまま欄を作り直す（タブ切替・再読込で消えないように） */
+function keepVals(sel){const m={};document.querySelectorAll(sel).forEach(i=>{if(i.value!=='')m[i.dataset.size]=i.value});return m}
 function buildSizes(cont,prefix,withStock){
-  const z=withStock?stock():null;
+  const z=withStock?stock():null,keep=keepVals(`[data-p="${prefix}"]`);
   cont.innerHTML=D.sizes.map(s=>{
     const st=z?fmt(z[s].h+z[s].b-z[s].s-z[s].o):'';
-    return `<div class="sz"><label>${s}${withStock?`<br><span style="font-weight:400;color:#7a6a5a">(${st})</span>`:''}</label><input type="number" step="0.1" min="0" inputmode="decimal" data-size="${s}" data-p="${prefix}" placeholder="0"></div>`;
+    return `<div class="sz"><label>${esc(s)}${withStock?`<br><span style="font-weight:400;color:#7a6a5a">(${st})</span>`:''}</label><input type="number" step="0.1" min="0" inputmode="decimal" data-size="${esc(s)}" data-p="${prefix}" placeholder="0" value="${keep[s]||''}"></div>`;
   }).join('');
   cont.querySelectorAll('input').forEach(i=>i.oninput=()=>calcTotal(prefix));
   calcTotal(prefix);
 }
 function priceFor(sup){const o=(D.supPrices&&D.supPrices[sup])||{};return Object.assign({},D.prices,o)}
+let buyPriceSup=null;   // 単価欄を最後に初期化した買取先（買取先を変えた時だけ単価を入れ直す）
 function buildBuySizes(){
-  const cur=$('b-waste')?$('b-waste').value:'';const pr=priceFor($('b-sup').value);
-  $('b-sizes').innerHTML=D.sizes.map(s=>`<div class="sz"><label>${s}</label><input type="number" step="0.1" min="0" inputmode="decimal" data-size="${s}" data-p="b" placeholder="kg"><input type="number" min="0" inputmode="numeric" data-size="${s}" data-pp="b" value="${pr[s]||''}" placeholder="円/kg" style="margin-top:4px;font-size:14px"></div>`).join('')+
+  const sup=$('b-sup').value,cur=$('b-waste')?$('b-waste').value:'';const pr=priceFor(sup);
+  const keepQ=keepVals('[data-p="b"]'),keepP=buyPriceSup===sup?keepVals('[data-pp="b"]'):{};
+  $('b-sizes').innerHTML=D.sizes.map(s=>`<div class="sz"><label>${esc(s)}</label><input type="number" step="0.1" min="0" inputmode="decimal" data-size="${esc(s)}" data-p="b" placeholder="kg" value="${keepQ[s]||''}"><input type="number" min="0" inputmode="numeric" data-size="${esc(s)}" data-pp="b" value="${keepP[s]!=null?keepP[s]:(pr[s]||'')}" placeholder="円/kg" style="margin-top:4px;font-size:14px"></div>`).join('')+
     '<div class="sz"><label>廃棄（kg）</label><input type="number" step="0.1" min="0" inputmode="decimal" id="b-waste" placeholder="0"></div>';
+  buyPriceSup=sup;
   if(cur)$('b-waste').value=cur;
   $('b-sizes').querySelectorAll('input').forEach(i=>i.oninput=calcBuy);calcBuy();
-  const note=$('b-price-note');if(note){const sp=D.supPrices&&D.supPrices[$('b-sup').value];note.textContent=sp?`${$('b-sup').value} 専用の単価を適用しています`:''}
+  const note=$('b-price-note');if(note){const sp=D.supPrices&&D.supPrices[sup];note.textContent=sp?`${sup} 専用の単価を適用しています`:''}
 }
 function readPrices(){const p={};document.querySelectorAll('[data-pp="b"]').forEach(i=>{p[i.dataset.size]=+i.value||0});return p}
 function calcBuy(){const q=readSizes('b'),p=readPrices();$('b-total').textContent=fmt(sum(q));$('b-amt').textContent=yen(D.sizes.reduce((a,s)=>a+(q[s]||0)*(p[s]||0),0))}
@@ -551,7 +562,7 @@ function buildForms(){
   if(!$('b-date').value)$('b-date').value=today();
 
   buildSizes($('h-sizes'),'h',false);buildWaste();buildSizes($('s-sizes'),'s',true);buildSizes($('po-sizes'),'po',true);buildBuySizes();
-  $('dest-list').innerHTML=[...new Set(D.ship.map(r=>r.dest).concat(D.peelShip.map(r=>r.dest)))].map(d=>`<option value="${d}">`).join('');
+  $('dest-list').innerHTML=[...new Set(D.ship.map(r=>r.dest).concat(D.peelShip.map(r=>r.dest)))].filter(Boolean).map(d=>`<option value="${esc(d)}">`).join('');
 }
 function buildWaste(){
   const cur=$('h-waste')?$('h-waste').value:'';
@@ -577,7 +588,7 @@ $('s-save').onclick=async()=>{
   if(!$('s-date').value)return toast('日付を入力してください');
   if(!dest)return toast('出荷先を入力してください');
   if(sum(q)<=0)return toast('出荷量を入力してください');
-  const z=stock();const over=D.sizes.filter(s=>(z[s].h+z[s].b-z[s].s-z[s].o)<q[s]);
+  const z=stock();const over=D.sizes.filter(s=>(z[s].h+z[s].b-z[s].s-z[s].o)+EPS<q[s]);
   const doSave=async()=>{
     const rec={id:uid(),date:$('s-date').value,dest,q,price:+$('s-price').value||null,memo:$('s-memo').value.trim()};
     if(!(await send('add',{kind:'ship',record:rec},'出荷を記録しました')))return;
@@ -585,12 +596,12 @@ $('s-save').onclick=async()=>{
     document.querySelectorAll('[data-p="s"]').forEach(i=>i.value='');$('s-memo').value='';$('s-price').value='';
     renderAll();showShipDoc(rec.id);
   };
-  if(over.length){$('modal-ok').textContent='記録する';confirmBox(`${over.join('・')}が在庫を超えています。それでも記録しますか？`,()=>{doSave();$('modal-ok').textContent='削除する'})}
+  if(over.length)confirmBox(`${over.join('・')}が在庫を超えています。それでも記録しますか？`,doSave,'記録する');
   else doSave();
 };
 
 /* ---- 買取保存 ---- */
-$('b-sup').onchange=()=>{const add=$('b-sup').value==='__add__';$('b-newsup').hidden=!add;if(add){$('b-newsup-name').focus()}else{buildBuySizes();renderBuyList()}};
+$('b-sup').onchange=()=>{const add=$('b-sup').value==='__add__';$('b-newsup').hidden=!add;if(add){$('b-newsup-name').focus()}else{buildBuySizes();renderBuyList()}};  // 買取先が変わると単価欄はその買取先の単価に入れ直される
 $('b-newsup-ok').onclick=async()=>{
   const v=$('b-newsup-name').value.trim();
   if(!v)return toast('名前を入力してください');
@@ -636,12 +647,12 @@ $('dm-pdf').onclick=()=>{
 
 /* ---- 書類共通 ---- */
 function docHead(title,sup,lines2){return `<h1>${title}</h1>
-   <div class="meta"><div><div class="to">${sup}</div>${lines2}</div>
+   <div class="meta"><div><div class="to">${esc(sup)}</div>${lines2}</div>
    <div class="from"><b>${CO.name}</b><br>${CO.zip} ${CO.addr}<br>${CO.tel}<br>${CO.inv}</div></div>`}
 function docTable(rows,withDate){
   let lines='',total=0,kg=0;
   rows.forEach(r=>D.sizes.forEach(s=>{const w=+r.q[s]||0;if(!w)return;const amt=w*(+r.p[s]||0);total+=amt;kg+=w;
-    lines+=`<tr>${withDate?`<td>${r.date.slice(5).replace('-','/')}</td>`:''}<td>${s}</td><td>${fmt(w)}</td><td>${yen(r.p[s]||0)}</td><td>${yen(amt)}</td></tr>`}));
+    lines+=`<tr>${withDate?`<td>${r.date.slice(5).replace('-','/')}</td>`:''}<td>${esc(s)}</td><td>${fmt(w)}</td><td>${yen(r.p[s]||0)}</td><td>${yen(amt)}</td></tr>`}));
   const html=`<table><tr>${withDate?'<th>日付</th>':''}<th>サイズ</th><th>重量(kg)</th><th>単価(円/kg)</th><th>金額(円)</th></tr>${lines}
    <tr><td colspan="${withDate?2:1}" style="text-align:right"><b>合計</b></td><td><b>${fmt(kg)}</b></td><td></td><td><b>${yen(total)}</b></td></tr></table>`;
   return {html,total,kg};
@@ -650,7 +661,7 @@ function sizeSummary(rows){
   const agg={};rows.forEach(r=>D.sizes.forEach(s=>{const w=+r.q[s]||0;if(!w)return;const a=agg[s]||(agg[s]={kg:0,amt:0,prices:{}});a.kg+=w;a.amt+=w*(+r.p[s]||0);a.prices[+r.p[s]||0]=1}));
   const ks=D.sizes.filter(s=>agg[s]);if(!ks.length)return '';
   let tk=0,ta=0;
-  const lines=ks.map(s=>{const a=agg[s];tk+=a.kg;ta+=a.amt;const pr=Object.keys(a.prices).map(Number);const pt=pr.length===1?yen(pr[0]):pr.map(yen).join('／');return `<tr><td>${s}</td><td>${fmt(a.kg)}</td><td>${pt}</td><td>${yen(a.amt)}</td></tr>`}).join('');
+  const lines=ks.map(s=>{const a=agg[s];tk+=a.kg;ta+=a.amt;const pr=Object.keys(a.prices).map(Number);const pt=pr.length===1?yen(pr[0]):pr.map(yen).join('／');return `<tr><td>${esc(s)}</td><td>${fmt(a.kg)}</td><td>${pt}</td><td>${yen(a.amt)}</td></tr>`}).join('');
   return `<div style="margin-top:16px;font-weight:700">サイズ別 合計</div>
    <table><tr><th>サイズ</th><th>重量(kg)</th><th>単価(円/kg)</th><th>金額(円)</th></tr>${lines}
    <tr><td style="text-align:right"><b>合計</b></td><td><b>${fmt(tk)}</b></td><td></td><td><b>${yen(ta)}</b></td></tr></table>`;
@@ -661,7 +672,7 @@ const jd=d=>{const [y,m,dd]=d.split('-');return `${y}年${+m}月${+dd}日`};
 function showDelivery(id){
   const r=D.buy.find(x=>x.id===id);if(!r)return;
   const kg=sum(r.q);
-  const lines=D.sizes.map(s=>{const w=+r.q[s]||0;return w?`<tr><td>${s}</td><td>${fmt(w)}</td></tr>`:''}).join('');
+  const lines=D.sizes.map(s=>{const w=+r.q[s]||0;return w?`<tr><td>${esc(s)}</td><td>${fmt(w)}</td></tr>`:''}).join('');
   const cum=D.buy.filter(x=>x.sup===r.sup&&(x.date<r.date||(x.date===r.date&&x.id<=r.id)));
   const ckg=cum.reduce((a,x)=>a+sum(x.q),0);
   showDoc(docHead('納品書',r.sup,`<div style="margin-top:6px">納品日：${jd(r.date)}</div><div>発行日：${jd(today())}</div>`)+
@@ -672,7 +683,7 @@ function showDelivery(id){
     <div class="grand">合計　${fmt(kg)} kg</div>
     <table style="width:auto;margin-left:auto"><tr><th>今シーズン累計（${cum.length}回）</th><th>重量(kg)</th></tr>
     <tr><td>${jd(cum[0].date)} 〜 ${jd(r.date)}</td><td>${fmt(ckg)}</td></tr></table>
-    <div class="foot">※お支払金額は期間終了後の買取明細書にてご案内します。${r.memo?'<br>'+r.memo:''}</div>`,
+    <div class="foot">※お支払金額は期間終了後の買取明細書にてご案内します。${r.memo?'<br>'+esc(r.memo):''}</div>`,
    `納品書_${r.sup}_${r.date}`);
 }
 
@@ -683,13 +694,13 @@ function showShipDoc(id){
   const pr=+r.price||0,kg=sum(r.q);
   let lines='';
   D.sizes.forEach(s=>{const w=+r.q[s]||0;if(!w)return;
-    lines+=`<tr><td>${s}</td><td>${fmt(w)}</td>${pr?`<td>${yen(pr)}</td><td>${yen(w*pr)}</td>`:''}</tr>`});
+    lines+=`<tr><td>${esc(s)}</td><td>${fmt(w)}</td>${pr?`<td>${yen(pr)}</td><td>${yen(w*pr)}</td>`:''}</tr>`});
   showDoc(docHead('納品書',honor(r.dest),`<div style="margin-top:6px">納品日：${jd(r.date)}</div><div>発行日：${jd(today())}</div>`)+
    `<p>下記のとおり納品いたしました。</p>
     <table><tr><th>サイズ</th><th>重量(kg)</th>${pr?'<th>単価(円/kg)</th><th>金額(円)</th>':''}</tr>${lines}
     <tr><td style="text-align:right"><b>合計</b></td><td><b>${fmt(kg)}</b></td>${pr?`<td></td><td><b>${yen(kg*pr)}</b></td>`:''}</tr></table>
     ${pr?`<div class="grand">合計金額　${yen(kg*pr)} 円<small>（内消費税等 8%：${yen(Math.floor(kg*pr*8/108))} 円）</small></div>`:`<div class="grand">合計　${fmt(kg)} kg</div>`}
-    <div class="foot">${pr?'※単価・金額は税込（軽減税率8%対象）です。':'※単価は別途ご連絡いたします。'}${r.memo?'<br>'+r.memo:''}</div>`,
+    <div class="foot">${pr?'※単価・金額は税込（軽減税率8%対象）です。':'※単価は別途ご連絡いたします。'}${r.memo?'<br>'+esc(r.memo):''}</div>`,
    `納品書_${r.dest}_${r.date}`);
 }
 /* ---- 買取明細書（期間まとめ） ---- */
@@ -698,7 +709,7 @@ $('d-make').onclick=()=>{
   const rows=D.buy.filter(r=>r.sup===sup&&(!f||r.date>=f)&&(!tEnd||r.date<=tEnd)).sort((a,b)=>a.date.localeCompare(b.date));
   if(!rows.length)return toast('該当する買取記録がありません');
   const t=docTable(rows,true),tax=Math.floor(t.total*8/108),tw=rows.reduce((a,r)=>a+(+r.waste||0),0);
-  showDoc(docHead('買取明細書',sup,`<div style="margin-top:6px">対象期間：${jd(rows[0].date)} 〜 ${jd(rows[rows.length-1].date)}（${rows.length}回）</div><div>発行日：${jd(today())}</div>${pay?`<div>お支払予定：${pay}</div>`:''}`)+
+  showDoc(docHead('買取明細書',sup,`<div style="margin-top:6px">対象期間：${jd(rows[0].date)} 〜 ${jd(rows[rows.length-1].date)}（${rows.length}回）</div><div>発行日：${jd(today())}</div>${pay?`<div>お支払予定：${esc(pay)}</div>`:''}`)+
    `<p>下記のとおり買取いたしましたので、お支払内容をご通知申し上げます。</p>
     <div class="grand">お支払金額　${yen(t.total)} 円<small>（内消費税等 8%：${yen(tax)} 円）</small></div>${t.html}${wasteBox(tw)}
     ${sizeSummary(rows)}
@@ -756,8 +767,8 @@ $('w-save').onclick=async()=>{
   D.peel.push(rec);
   $('w-good').value='';$('w-bad').value='';$('w-memo').value='';calcPeel();renderAll();
 };
-function cardW(r){return `<div class="card"><div class="hd"><b>${r.who}</b><span>${r.date}</span></div>
- <div class="bd">良品 <b>${fmt(r.good)}</b> kg × ${yen(r.gp)}円　／　傷あり <b>${fmt(r.bad)}</b> kg × ${yen(r.bp)}円　＝ <b>${yen(peelAmt(r))}</b> 円${r.memo?`<br>${r.memo}`:''}</div>
+function cardW(r){return `<div class="card"><div class="hd"><b>${esc(r.who)}</b><span>${r.date}</span></div>
+ <div class="bd">良品 <b>${fmt(r.good)}</b> kg × ${yen(r.gp)}円　／　傷あり <b>${fmt(r.bad)}</b> kg × ${yen(r.bp)}円　＝ <b>${yen(peelAmt(r))}</b> 円${r.memo?`<br>${esc(r.memo)}`:''}</div>
  <div class="ft"><button class="btn danger" onclick="del('peel','${r.id}')">削除</button></div></div>`}
 function renderPeelList(){
   const who=$('w-who').value,rows=D.peel.filter(r=>r.who===who).sort((a,b)=>b.date.localeCompare(a.date));
@@ -771,7 +782,7 @@ $('wd-make').onclick=()=>{
   let g=0,b=0,total=0;
   const lines=rows.map(r=>{g+=r.good;b+=r.bad;const a=peelAmt(r);total+=a;return `<tr><td>${r.date.slice(5).replace('-','/')}</td><td>${fmt(r.good)}</td><td>${yen(r.gp)}</td><td>${fmt(r.bad)}</td><td>${yen(r.bp)}</td><td>${yen(a)}</td></tr>`}).join('');
   showDoc(`<h1>支払明細書</h1>
-   <div class="meta"><div><div class="to">${who} 様</div><div style="margin-top:6px">作業内容：栗 鬼皮剥き</div><div>対象期間：${jd(rows[0].date)} 〜 ${jd(rows[rows.length-1].date)}（${rows.length}回）</div><div>発行日：${jd(today())}</div>${pay?`<div>お支払日：${pay}</div>`:''}</div>
+   <div class="meta"><div><div class="to">${esc(who)} 様</div><div style="margin-top:6px">作業内容：栗 鬼皮剥き</div><div>対象期間：${jd(rows[0].date)} 〜 ${jd(rows[rows.length-1].date)}（${rows.length}回）</div><div>発行日：${jd(today())}</div>${pay?`<div>お支払日：${esc(pay)}</div>`:''}</div>
    <div class="from"><b>${CO.name}</b><br>${CO.zip} ${CO.addr}<br>${CO.tel}</div></div>
    <div class="grand">お支払金額　${yen(total)} 円</div>
    <table><tr><th>日付</th><th>良品(kg)</th><th>単価</th><th>傷あり(kg)</th><th>単価</th><th>金額(円)</th></tr>${lines}
@@ -791,12 +802,12 @@ $('po-save').onclick=async()=>{
     if(!(await send('add',{kind:'peelOut',record:rec},'記録しました')))return;
     D.peelOut.push(rec);document.querySelectorAll('[data-p="po"]').forEach(i=>i.value='');$('po-memo').value='';calcTotal('po');renderAll();
   };
-  const z=stock();const over=D.sizes.filter(s=>(z[s].h+z[s].b-z[s].s-z[s].o)<q[s]);
-  if(over.length){$('modal-ok').textContent='記録する';confirmBox(`${over.join('・')}が在庫を超えています。それでも記録しますか？`,()=>{doSave();$('modal-ok').textContent='削除する'})}
+  const z=stock();const over=D.sizes.filter(s=>(z[s].h+z[s].b-z[s].s-z[s].o)+EPS<q[s]);
+  if(over.length)confirmBox(`${over.join('・')}が在庫を超えています。それでも記録しますか？`,doSave,'記録する');
   else doSave();
 };
-function cardPO(r){return `<div class="card"><div class="hd"><b>内職へ渡し → ${r.who}</b><span>${r.date}</span></div>
- <div class="bd">${sum(r.q)>0?D.sizes.map(s=>`${s} <b>${fmt(r.q[s]||0)}</b>`).join('　')+'　／ 計 ':'生栗（サイズ未指定） '}<b>${fmt(r.kg)}</b> kg${r.memo?`<br>${r.memo}`:''}</div>
+function cardPO(r){return `<div class="card"><div class="hd"><b>内職へ渡し → ${esc(r.who)}</b><span>${r.date}</span></div>
+ <div class="bd">${sum(r.q)>0?D.sizes.map(s=>`${esc(s)} <b>${fmt(r.q[s]||0)}</b>`).join('　')+'　／ 計 ':'生栗（サイズ未指定） '}<b>${fmt(r.kg)}</b> kg${r.memo?`<br>${esc(r.memo)}`:''}</div>
  <div class="ft"><button class="btn danger" onclick="del('peelOut','${r.id}')">削除</button></div></div>`}
 function renderPeelOut(){
   const who={};D.workers.forEach(w=>who[w]={out:0,g:0,b:0});
@@ -804,7 +815,7 @@ function renderPeelOut(){
   D.peel.forEach(r=>{who[r.who]=who[r.who]||{out:0,g:0,b:0};who[r.who].g+=+r.good||0;who[r.who].b+=+r.bad||0});
   const ks=Object.keys(who).filter(k=>who[k].out||who[k].g||who[k].b);
   $('po-table').innerHTML=ks.length?`<tr><th>作業者</th><th>渡した</th><th>戻った（良品）</th><th>戻った（傷あり）</th><th>未返却</th></tr>`+
-    ks.map(k=>{const w=who[k],open=w.out-w.g-w.b;return `<tr><td>${k}</td><td>${fmt(w.out)}</td><td>${fmt(w.g)}</td><td>${fmt(w.b)}</td><td class="${open<0?'neg':''}"><b>${fmt(open)}</b></td></tr>`}).join(''):
+    ks.map(k=>{const w=who[k],open=w.out-w.g-w.b;return `<tr><td>${esc(k)}</td><td>${fmt(w.out)}</td><td>${fmt(w.g)}</td><td>${fmt(w.b)}</td><td class="${open<0?'neg':''}"><b>${fmt(open)}</b></td></tr>`}).join(''):
     '<tr><td class="empty">まだ記録がありません</td></tr>';
 }
 
@@ -816,7 +827,7 @@ $('ps-save').onclick=async()=>{
   if(!$('ps-date').value)return toast('日付を入力してください');
   if(!dest)return toast('出荷先を入力してください');
   if(g+b<=0)return toast('出荷量を入力してください');
-  const pk=peelStock(),over=[];if(pk.good<g)over.push('良品');if(pk.bad<b)over.push('傷あり');
+  const pk=peelStock(),over=[];if(pk.good+EPS<g)over.push('良品');if(pk.bad+EPS<b)over.push('傷あり');
   const doSave=async()=>{
     const rec={id:uid(),date:$('ps-date').value,dest,good:g,bad:b,price:+$('ps-price').value||null,memo:$('ps-memo').value.trim()};
     if(!(await send('add',{kind:'peelShip',record:rec},'出荷を記録しました')))return;
@@ -824,11 +835,11 @@ $('ps-save').onclick=async()=>{
     $('ps-good').value='';$('ps-bad').value='';$('ps-price').value='';$('ps-memo').value='';
     renderAll();showPeelShipDoc(rec.id);
   };
-  if(over.length){$('modal-ok').textContent='記録する';confirmBox(`${over.join('・')}が在庫を超えています。それでも記録しますか？`,()=>{doSave();$('modal-ok').textContent='削除する'})}
+  if(over.length)confirmBox(`${over.join('・')}が在庫を超えています。それでも記録しますか？`,doSave,'記録する');
   else doSave();
 };
-function cardPS(r){const auto=/^ord_/.test(r.id);return `<div class="card"><div class="hd"><b>渋皮むき栗 → ${r.dest}</b><span>${r.date}</span></div>
- <div class="bd">良品 <b>${fmt(r.good)}</b> kg　／　傷あり <b>${fmt(r.bad)}</b> kg　／ 計 <b>${fmt(r.good+r.bad)}</b> kg${r.price?`　@${r.price}円`:''}${r.memo?`<br>${r.memo}`:''}</div>
+function cardPS(r){const auto=/^ord_/.test(r.id);return `<div class="card"><div class="hd"><b>渋皮むき栗 → ${esc(r.dest)}</b><span>${r.date}</span></div>
+ <div class="bd">良品 <b>${fmt(r.good)}</b> kg　／　傷あり <b>${fmt(r.bad)}</b> kg　／ 計 <b>${fmt(r.good+r.bad)}</b> kg${r.price?`　@${r.price}円`:''}${r.memo?`<br>${esc(r.memo)}`:''}</div>
  <div class="ft"><button class="btn tiny" onclick="showPeelShipDoc('${r.id}')">納品書</button>　${auto?'<span style="color:var(--sub);font-size:12px">注文アプリから自動登録</span>':`<button class="btn danger" onclick="del('peelShip','${r.id}')">削除</button>`}</div></div>`}
 function renderPeelShipList(){
   const rows=D.peelShip.slice().sort((a,b)=>b.date.localeCompare(a.date));
@@ -843,7 +854,7 @@ function showPeelShipDoc(id){
     <table><tr><th>品名</th><th>重量(kg)</th>${pr?'<th>単価(円/kg)</th><th>金額(円)</th>':''}</tr>${line('渋皮むき栗（良品）',r.good)}${line('渋皮むき栗（傷あり）',r.bad)}
     <tr><td style="text-align:right"><b>合計</b></td><td><b>${fmt(kg)}</b></td>${pr?`<td></td><td><b>${yen(kg*pr)}</b></td>`:''}</tr></table>
     ${pr?`<div class="grand">合計金額　${yen(kg*pr)} 円<small>（内消費税等 8%：${yen(Math.floor(kg*pr*8/108))} 円）</small></div>`:`<div class="grand">合計　${fmt(kg)} kg</div>`}
-    <div class="foot">${pr?'※単価・金額は税込（軽減税率8%対象）です。':'※単価は別途ご連絡いたします。'}${r.memo?'<br>'+r.memo:''}</div>`,
+    <div class="foot">${pr?'※単価・金額は税込（軽減税率8%対象）です。':'※単価は別途ご連絡いたします。'}${r.memo?'<br>'+esc(r.memo):''}</div>`,
    `納品書_渋皮むき栗_${r.dest}_${r.date}`);
 }
 
@@ -853,7 +864,7 @@ const gUnit=n=>{const g=D.goodsItems.find(x=>x.name===n);return g?g.unit:'個'};
 function goodsTable(){
   const st=goodsStock(),ks=Object.keys(st);
   if(!ks.length)return '<tr><td class="empty">設定で加工品の商品を追加してください</td></tr>';
-  return '<tr><th>商品</th><th>入庫</th><th>出庫</th><th>在庫</th></tr>'+ks.map(k=>{const z=st[k].in-st[k].out;return `<tr><td>${k}</td><td>${st[k].in}</td><td>${st[k].out}</td><td class="${z<0?'neg':''}"><b>${z}</b> ${gUnit(k)}</td></tr>`}).join('');
+  return '<tr><th>商品</th><th>入庫</th><th>出庫</th><th>在庫</th></tr>'+ks.map(k=>{const z=st[k].in-st[k].out;return `<tr><td>${esc(k)}</td><td>${st[k].in}</td><td>${st[k].out}</td><td class="${z<0?'neg':''}"><b>${z}</b> ${esc(gUnit(k))}</td></tr>`}).join('');
 }
 function buildGoodsForm(){
   fillSel($('g-item'),D.goodsItems.map(g=>g.name));
@@ -869,8 +880,8 @@ $('g-save').onclick=async()=>{
   if(!(await send('add',{kind:'goods',record:rec},'記録しました')))return;
   D.goods.push(rec);$('g-qty').value='';$('g-memo').value='';renderAll();
 };
-function cardG(r){const auto=/^ord_/.test(r.id);return `<div class="card"><div class="hd"><b>${r.dir==='in'?'入庫':'出庫'}　${r.item}</b><span>${r.date}</span></div>
- <div class="bd"><b>${r.qty}</b> ${gUnit(r.item)}${r.memo?`<br>${r.memo}`:''}</div>
+function cardG(r){const auto=/^ord_/.test(r.id);return `<div class="card"><div class="hd"><b>${r.dir==='in'?'入庫':'出庫'}　${esc(r.item)}</b><span>${r.date}</span></div>
+ <div class="bd"><b>${r.qty}</b> ${esc(gUnit(r.item))}${r.memo?`<br>${esc(r.memo)}`:''}</div>
  ${auto?'<div class="ft" style="color:var(--sub);font-size:12px">注文アプリから自動登録（取り消しは注文アプリ側で）</div>':`<div class="ft"><button class="btn danger" onclick="del('goods','${r.id}')">削除</button></div>`}</div>`}
 function renderGoodsList(){
   const rows=D.goods.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
@@ -900,14 +911,15 @@ async function saveSchedule(okMsg){
 function renderPlan(){
   if(!$('p-date').value)$('p-date').value=today();
   const d=$('p-date').value,rec=D.schedule[d]||{a:{},memo:''};
-  $('p-tasks').innerHTML=D.tasks.map(t=>`<div class="task"><div class="tn">${t}</div><div class="mem">${D.mems.map(m=>`<button class="${(rec.a[t]||[]).includes(m)?'on':''}" onclick="togMem('${d}','${t}','${m}')">${m}</button>`).join('')}</div></div>`).join('')||'<div class="empty">設定で作業の種類を追加してください</div>';
+  $('p-tasks').innerHTML=D.tasks.map((t,ti)=>`<div class="task"><div class="tn">${esc(t)}</div><div class="mem">${D.mems.map((m,mi)=>`<button class="${(rec.a[t]||[]).includes(m)?'on':''}" onclick="togMem('${d}',${ti},${mi})">${esc(m)}</button>`).join('')}</div></div>`).join('')||'<div class="empty">設定で作業の種類を追加してください</div>';
   $('p-memo').value=rec.memo||'';
   let h='<tr><th>作業</th>'+[...Array(7)].map((_,i)=>{const x=shiftDate(d,i);return `<th class="${x===today()?'today':''}">${x.slice(5).replace('-','/')}<br>(${wd(x)})</th>`}).join('')+'</tr>';
-  D.tasks.forEach(t=>{h+=`<tr><td><b>${t}</b></td>`+[...Array(7)].map((_,i)=>{const x=shiftDate(d,i),r=D.schedule[x],ms=r&&r.a[t]||[];const g=new Date(x+'T00:00:00').getDay();return `<td class="${x===today()?'today':''} ${g===6?'sat':g===0?'sun':''}">${ms.join('<br>')||'<span style="color:#ccc">－</span>'}</td>`}).join('')+'</tr>'});
-  h+='<tr><td>メモ</td>'+[...Array(7)].map((_,i)=>{const x=shiftDate(d,i),r=D.schedule[x];return `<td>${r&&r.memo?r.memo:''}</td>`}).join('')+'</tr>';
+  D.tasks.forEach(t=>{h+=`<tr><td><b>${esc(t)}</b></td>`+[...Array(7)].map((_,i)=>{const x=shiftDate(d,i),r=D.schedule[x],ms=r&&r.a[t]||[];const g=new Date(x+'T00:00:00').getDay();return `<td class="${x===today()?'today':''} ${g===6?'sat':g===0?'sun':''}">${ms.map(esc).join('<br>')||'<span style="color:#ccc">－</span>'}</td>`}).join('')+'</tr>'});
+  h+='<tr><td>メモ</td>'+[...Array(7)].map((_,i)=>{const x=shiftDate(d,i),r=D.schedule[x];return `<td>${r&&r.memo?esc(r.memo):''}</td>`}).join('')+'</tr>';
   $('p-week').innerHTML=h;
 }
-async function togMem(d,t,m){
+async function togMem(d,ti,mi){
+  const t=D.tasks[ti],m=D.mems[mi];if(t==null||m==null)return;
   const before=JSON.parse(JSON.stringify(D.schedule));
   const r=day(d);r.a[t]=r.a[t]||[];const i=r.a[t].indexOf(m);i>=0?r.a[t].splice(i,1):r.a[t].push(m);
   renderPlan();
@@ -924,14 +936,14 @@ $('p-memo').onchange=async()=>{
 };
 
 /* ---- 表示 ---- */
-function cardH(r){return `<div class="card"><div class="hd"><b>${r.field}</b><span>${r.date}</span></div>
- <div class="bd">${D.sizes.map(s=>`${s} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg${+r.waste?`　／ 廃棄 <b>${fmt(r.waste)}</b> kg`:''}${r.memo?`<br>${r.memo}`:''}</div>
+function cardH(r){return `<div class="card"><div class="hd"><b>${esc(r.field)}</b><span>${r.date}</span></div>
+ <div class="bd">${D.sizes.map(s=>`${esc(s)} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg${+r.waste?`　／ 廃棄 <b>${fmt(r.waste)}</b> kg`:''}${r.memo?`<br>${esc(r.memo)}`:''}</div>
  <div class="ft"><button class="btn danger" onclick="del('harvest','${r.id}')">削除</button></div></div>`}
-function cardS(r){const auto=/^ord_/.test(r.id);return `<div class="card"><div class="hd"><b>→ ${r.dest}</b><span>${r.date}</span></div>
- <div class="bd">${D.sizes.map(s=>`${s} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg${r.price?`　@${r.price}円`:''}${r.memo?`<br>${r.memo}`:''}</div>
+function cardS(r){const auto=/^ord_/.test(r.id);return `<div class="card"><div class="hd"><b>→ ${esc(r.dest)}</b><span>${r.date}</span></div>
+ <div class="bd">${D.sizes.map(s=>`${esc(s)} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg${r.price?`　@${r.price}円`:''}${r.memo?`<br>${esc(r.memo)}`:''}</div>
  <div class="ft"><button class="btn tiny" onclick="showShipDoc('${r.id}')">納品書</button>　${auto?'<span style="color:var(--sub);font-size:12px">注文アプリから自動登録</span>':`<button class="btn danger" onclick="del('ship','${r.id}')">削除</button>`}</div></div>`}
-function cardB(r){return `<div class="card"><div class="hd"><b>買取 ← ${r.sup}</b><span>${r.date}</span></div>
- <div class="bd">${D.sizes.map(s=>`${s} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg　<b>${yen(buyAmount(r))}</b> 円${+r.waste?`　／ 廃棄 <b>${fmt(r.waste)}</b> kg（支払対象外）`:''}${r.memo?`<br>${r.memo}`:''}</div>
+function cardB(r){return `<div class="card"><div class="hd"><b>買取 ← ${esc(r.sup)}</b><span>${r.date}</span></div>
+ <div class="bd">${D.sizes.map(s=>`${esc(s)} <b>${fmt(r.q[s]||0)}</b>`).join('　')}　／ 計 <b>${fmt(sum(r.q))}</b> kg　<b>${yen(buyAmount(r))}</b> 円${+r.waste?`　／ 廃棄 <b>${fmt(r.waste)}</b> kg（支払対象外）`:''}${r.memo?`<br>${esc(r.memo)}`:''}</div>
  <div class="ft"><button class="btn tiny" onclick="showDelivery('${r.id}')">納品書</button>　<button class="btn danger" onclick="del('buy','${r.id}')">削除</button></div></div>`}
 function del(kind,id){confirmBox('この記録を削除しますか？',async()=>{
   if(!(await send('delete',{kind,id},'削除しました')))return;
@@ -951,7 +963,7 @@ function renderStock(){
   const z=stock();let th=0,ts=0,tb=0;
   D.sizes.forEach(s=>{th+=z[s].h;tb+=z[s].b;ts+=z[s].s});
   const row=(label,f)=>{let t=0;const st=label==='在庫'?' style="background:var(--soft)"':'';return `<tr${st}><td><b>${label}</b></td>`+D.sizes.map(s=>{const n=f(z[s]);t+=n;return `<td class="${n<0?'neg':''}">${fmt(n)}</td>`}).join('')+`<td><b>${fmt(t)}</b></td></tr>`};
-  let html=`<tr><th>サイズ</th>${D.sizes.map(s=>`<th>${s}</th>`).join('')}<th>合計</th></tr>`+row('収穫',c=>c.h);
+  let html=`<tr><th>サイズ</th>${D.sizes.map(s=>`<th>${esc(s)}</th>`).join('')}<th>合計</th></tr>`+row('収穫',c=>c.h);
   if(D.buy.length)html+=row('買取',c=>c.b);
   html+=row('出荷',c=>c.s?-c.s:0);
   if(D.peelOut.length)html+=row('内職渡し',c=>c.o?-c.o:0);
@@ -961,7 +973,7 @@ function renderStock(){
   $('st-table').innerHTML=html;$('st-h').innerHTML=fmt(th)+'<i>kg</i>';$('st-s').innerHTML=fmt(ts)+'<i>kg</i>';$('st-b').innerHTML=fmt(tb)+'<i>kg</i>';const tpo=peelOutTotal();$('st-po').innerHTML=fmt(tpo)+'<i>kg</i>';$('st-z').innerHTML=fmt(rawStockTotal())+'<i>kg</i>';
   const pk=peelStock();$('sp-gin').innerHTML=fmt(pk.gin)+'<i>kg</i>';$('sp-bin').innerHTML=fmt(pk.bin)+'<i>kg</i>';$('sp-out').innerHTML=fmt(pk.gout+pk.bout)+'<i>kg</i>';$('sp-good').innerHTML=fmt(pk.good)+'<i>kg</i>';$('sp-bad').innerHTML=fmt(pk.bad)+'<i>kg</i>';$('st-w').innerHTML=`自社 ${fmt(tw)}<i>kg</i>／買取 ${fmt(tbw)}<i>kg</i>`;
   const grp=(arr,key)=>{const g={};arr.forEach(r=>{g[r[key]]=g[r[key]]||{n:0,q:{}};g[r[key]].n+=sum(r.q);D.sizes.forEach(s=>g[r[key]].q[s]=(g[r[key]].q[s]||0)+(+r.q[s]||0))});return g};
-  const tbl=(g,label,w)=>{const ks=Object.keys(g);if(!ks.length)return `<tr><td class="empty">記録なし</td></tr>`;return `<tr><th>${label}</th>${D.sizes.map(s=>`<th>${s}</th>`).join('')}<th>合計</th>${w?'<th>廃棄</th>':''}</tr>`+ks.sort((a,b)=>g[b].n-g[a].n).map(k=>`<tr><td>${k}</td>${D.sizes.map(s=>`<td>${fmt(g[k].q[s]||0)}</td>`).join('')}<td><b>${fmt(g[k].n)}</b></td>${w?`<td>${fmt(w[k]||0)}</td>`:''}</tr>`).join('')};
+  const tbl=(g,label,w)=>{const ks=Object.keys(g);if(!ks.length)return `<tr><td class="empty">記録なし</td></tr>`;return `<tr><th>${label}</th>${D.sizes.map(s=>`<th>${esc(s)}</th>`).join('')}<th>合計</th>${w?'<th>廃棄</th>':''}</tr>`+ks.sort((a,b)=>g[b].n-g[a].n).map(k=>`<tr><td>${esc(k)}</td>${D.sizes.map(s=>`<td>${fmt(g[k].q[s]||0)}</td>`).join('')}<td><b>${fmt(g[k].n)}</b></td>${w?`<td>${fmt(w[k]||0)}</td>`:''}</tr>`).join('')};
   const fw={};D.harvest.forEach(r=>{fw[r.field]=(fw[r.field]||0)+(+r.waste||0)});
   $('st-field').innerHTML=tbl(grp(D.harvest,'field'),'園地',fw);
   const sw={};D.buy.forEach(r=>{sw[r.sup]=(sw[r.sup]||0)+(+r.waste||0)});
@@ -985,10 +997,10 @@ function renderList(){
 }
 $('l-kind').onchange=renderList;$('l-month').onchange=renderList;
 function renderSettings(){
-  const chips=(arr,kind)=>arr.map((v,i)=>`<span class="chip">${v}<button title="削除" onclick="rmItem('${kind}',${i})">×</button></span>`).join('')||'<span class="empty">未登録</span>';
+  const chips=(arr,kind)=>arr.map((v,i)=>`<span class="chip">${esc(v)}<button title="削除" onclick="rmItem('${kind}',${i})">×</button></span>`).join('')||'<span class="empty">未登録</span>';
   $('c-fields').innerHTML=chips(D.fields,'fields');$('c-sizes').innerHTML=chips(D.sizes,'sizes');$('c-sups').innerHTML=chips(D.sups,'sups');$('c-mems').innerHTML=chips(D.mems,'mems');$('c-workers').innerHTML=chips(D.workers,'workers');$('c-tasks').innerHTML=chips(D.tasks,'tasks');
-  $('c-goods').innerHTML=D.goodsItems.map((g,i)=>`<span class="chip">${g.name}（${g.unit}）<button title="削除" onclick="rmGoods(${i})">×</button></span>`).join('')||'<span class="empty">未登録</span>';
-  $('c-prices').innerHTML=D.sizes.map(s=>`<div class="sz"><label>${s}</label><input type="number" min="0" inputmode="numeric" value="${D.prices[s]||''}" placeholder="円/kg" onchange="savePrice('${s}',this.value)"></div>`).join('');
+  $('c-goods').innerHTML=D.goodsItems.map((g,i)=>`<span class="chip">${esc(g.name)}（${esc(g.unit)}）<button title="削除" onclick="rmGoods(${i})">×</button></span>`).join('')||'<span class="empty">未登録</span>';
+  $('c-prices').innerHTML=D.sizes.map((s,i)=>`<div class="sz"><label>${esc(s)}</label><input type="number" min="0" inputmode="numeric" value="${D.prices[s]||''}" placeholder="円/kg" onchange="savePrice(${i},this.value)"></div>`).join('');
   fillSel($('c-sp-sup'),D.sups);renderSupPrices();
 }
 function rmItem(kind,i){confirmBox(`「${D[kind][i]}」を一覧から外しますか？（過去の記録は残ります）`,async()=>{
@@ -1005,20 +1017,22 @@ async function addItem(kind,inputId){
 }
 function renderSupPrices(){
   const sup=$('c-sp-sup').value,o=(D.supPrices&&D.supPrices[sup])||{};
-  $('c-sp-prices').innerHTML=D.sizes.map(s=>`<div class="sz"><label>${s}</label><input type="number" min="0" inputmode="numeric" value="${o[s]||''}" placeholder="${D.prices[s]||''}" onchange="saveSupPrice('${sup}','${s}',this.value)"></div>`).join('');
+  $('c-sp-prices').innerHTML=D.sizes.map((s,i)=>`<div class="sz"><label>${esc(s)}</label><input type="number" min="0" inputmode="numeric" value="${o[s]||''}" placeholder="${D.prices[s]||''}" onchange="saveSupPrice(${i},this.value)"></div>`).join('');
 }
 $('c-sp-sup').onchange=renderSupPrices;
-async function saveSupPrice(sup,s,val){
+async function saveSupPrice(si,val){
+  const sup=$('c-sp-sup').value,s=D.sizes[si];if(!sup||s==null)return;
   const next=JSON.parse(JSON.stringify(D.supPrices||{}));next[sup]=next[sup]||{};
   if(+val>0)next[sup][s]=+val;else delete next[sup][s];
   if(!Object.keys(next[sup]).length)delete next[sup];
   if(!(await send('saveSettings',settingsPayload({supPrices:next}),'単価を保存しました')))return;
-  D.supPrices=next;buildBuySizes();renderSupPrices();
+  D.supPrices=next;buyPriceSup=null;buildBuySizes();renderSupPrices();
 }
-async function savePrice(s,val){
+async function savePrice(si,val){
+  const s=D.sizes[si];if(s==null)return;
   const next=Object.assign({},D.prices);next[s]=+val||0;
   if(!(await send('saveSettings',settingsPayload({prices:next}),'単価を保存しました')))return;
-  D.prices=next;buildBuySizes();
+  D.prices=next;buyPriceSup=null;buildBuySizes();
 }
 $('add-field-btn').onclick=()=>addItem('fields','add-field');
 $('add-size-btn').onclick=()=>addItem('sizes','add-size');
@@ -1042,7 +1056,7 @@ $('l-csv').onclick=()=>{
   dl(`栗収穫管理_${today()}.csv`,[head,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n'),'text/csv');
 };
 $('exp-json').onclick=()=>dl(`kuri-backup_${today()}.json`,JSON.stringify(D,null,1),'application/json');
-$('clear-all').onclick=()=>confirmBox('すべての記録（収穫・出荷・買取・内職・内職渡し・渋皮出荷）を削除します。元に戻せません。',()=>{
+$('clear-all').onclick=()=>confirmBox('すべての記録（収穫・出荷・買取・内職・内職渡し・渋皮出荷・加工品）を削除します。注文アプリから自動登録された分も消えます。元に戻せません。',()=>{
   const n=D.harvest.length+D.ship.length+D.buy.length+D.peel.length+D.peelOut.length+D.peelShip.length+D.goods.length;
   if(!n)return toast('削除する記録がありません');
   confirmBox(`本当によろしいですか？　記録 ${n} 件をスプレッドシートから削除します。（設定・作業予定は残ります）`,deleteAllRecords);
@@ -1064,7 +1078,15 @@ async function deleteAllRecords(){
   toast(ng?'削除できませんでした。通信を確認してください':'削除しました');
 }
 
-function renderAll(){buildForms();buildPeelForm();buildGoodsForm();renderToday();renderBuyList();renderPeelList();renderPeelOut();renderPeelShipList();renderGoodsList();renderPlan();renderStock();renderList();renderSettings()}
+/* 注文アプリから来た商品名で在庫に対応づけられなかったものを知らせる */
+function renderSyncWarn(){
+  const el=$('sync-warn');const names={};
+  (D.syncLog||[]).forEach(l=>(l.unknown||[]).forEach(n=>{names[n]=l.at||''}));
+  const ks=Object.keys(names);
+  el.style.display=ks.length?'block':'none';
+  el.innerHTML=ks.length?`<b>注文アプリの商品名が在庫に対応づけられず、在庫を減らせませんでした：</b><br>${ks.map(esc).join('、')}<br><span style="color:var(--sub)">注文アプリの商品マスタ名（例：丹波栗 生栗 3L／丹波栗ペースト 2kg）で登録し直すと自動で反映されます。手動で出荷・出庫を記録した場合は無視してください。</span>`:'';
+}
+function renderAll(){buildForms();buildPeelForm();buildGoodsForm();renderToday();renderBuyList();renderPeelList();renderPeelOut();renderPeelShipList();renderGoodsList();renderPlan();renderStock();renderList();renderSettings();renderSyncWarn()}
 renderAll();
 boot();
 </script>

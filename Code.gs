@@ -15,6 +15,7 @@
  *         harvest,ship,buy,peel,peelOut,peelShip,schedule}
  *   POST {action:'add',          kind:'harvest'|'ship'|'buy'|'peel'|'peelOut'|'peelShip', record:{...}}
  *   POST {action:'delete',       kind:同上, id:'...'}
+ *   POST {action:'markPaid',     ids:[内職id...], paid:'yyyy-MM-dd'|''}   ← 内職の支払済／未払い
  *   POST {action:'saveSettings', fields?, sizes?, sups?, mems?, tasks?,
  *                                workers?, prices?, peelPrice?, supPrices?, goodsItems?, orderMap?, schedule?}
  *   POST {action:'orderShip',   orderId, date, dest, lines:[{name,qty}], memo}   ← 注文発送管理アプリから
@@ -92,6 +93,7 @@ function doPost(e) {
     if (action === 'add')          return json({ ok: true, data: addRecord(body.kind, body.record) });
     if (action === 'delete')       return json({ ok: true, data: deleteRecord(body.kind, body.id) });
     if (action === 'saveSettings') return json({ ok: true, data: saveSettings(body) });
+    if (action === 'markPaid')     return json({ ok: true, data: markPaid(body.ids, body.paid) });
     if (action === 'getAll')       return json({ ok: true, data: getAll() });
     if (action === 'orderShip')    return json({ ok: true, data: orderShip(body) });
     if (action === 'orderCancel')  return json({ ok: true, data: orderCancel(body.orderId) });
@@ -186,6 +188,22 @@ function deleteRecord(kind, id) {
   return { deleted: 0 };   // 既に無い場合もエラーにしない
 }
 
+/** 内職の記録に支払日を付ける／外す。ids: 内職レコードのid配列、paid: 'yyyy-MM-dd'（空なら未払いに戻す） */
+function markPaid(ids, paid) {
+  ids = (ids || []).map(function (x) { return String(x).trim(); });
+  paid = String(paid || '').trim();
+  var ss = ss_(), st = readSettings(ss);
+  var sh = sheet_(ss, SHEETS.peel, headersFor('peel', st.sizes));
+  var head = ensureHeaders(sh, headersFor('peel', st.sizes));
+  var ci = head.indexOf('id'), cp = head.indexOf('支払日');
+  if (sh.getLastRow() < 2) return { updated: 0 };
+  var col = sh.getRange(2, ci + 1, sh.getLastRow() - 1, 1).getValues(), n = 0;
+  for (var r = 0; r < col.length; r++) {
+    if (ids.indexOf(String(col[r][0]).trim()) >= 0) { sh.getRange(r + 2, cp + 1).setValue(paid); n++; }
+  }
+  return { updated: n, paid: paid };
+}
+
 function saveSettings(body) {
   var ss  = ss_();
   var cur = readSettings(ss);
@@ -245,7 +263,7 @@ function orderShip(body) {
     var name = String(l.name || '').trim(), qty = num(l.qty);
     if (!name || qty <= 0) return;
     var m = map[name] || guessLine_(name, st);
-    if (!m) { if (!/送料|運賃|手数料/.test(name)) unknown.push(name); return; }
+    if (!m) { if (!isIgnoredLine_(name)) unknown.push(name); return; }
     if (m.kind === 'ship')          q[m.size] = (q[m.size] || 0) + qty;
     else if (m.kind === 'peelShip') peel[m.field === 'bad' ? 'bad' : 'good'] += qty;
     else if (m.kind === 'goods')    goods.push({ item: m.item || name, qty: qty });
@@ -323,6 +341,15 @@ function guessLine_(name, st) {
   return null;
 }
 
+/** 在庫管理の対象外として黙って無視する商品名（2026-11-10 栗原さん決定：瓶詰の渋皮煮、サイズの無い渋皮付き栗） */
+function isIgnoredLine_(name) {
+  var n = String(name).replace(/[\s　]+/g, '');
+  if (/送料|運賃|手数料|段ボール|箱代/.test(n)) return true;
+  if (/瓶|ビン/.test(n)) return true;                                   // 渋皮煮 瓶・小瓶
+  if (/渋皮付|皮付/.test(n) && !/([2-5]L|L|M)(?![A-Za-z])/.test(n.replace(/[Ａ-Ｚ]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }))) return true;  // サイズなしの渋皮付
+  return false;
+}
+
 function writeSyncLog_(ss, orderId, dest, added, unknown) {
   var sh = sheet_(ss, LOG_SHEET, ['日時', '注文ID', '出荷先', '登録した在庫', '対応づけできなかった商品名']);
   // 同じ注文IDの古い行は消して最新だけ残す（名前を直して再登録したら注意表示も消えるように）
@@ -377,7 +404,7 @@ function headersFor(kind, sizes) {
     return ['id', '日付', '出荷先'].concat(sizes).concat(['合計kg', '単価', 'メモ', '登録日時']);
   }
   if (kind === 'peel') {
-    return ['id', '日付', '作業者', '良品kg', '良品単価', '傷ありkg', '傷あり単価', '合計kg', '金額', 'メモ', '登録日時'];
+    return ['id', '日付', '作業者', '良品kg', '良品単価', '傷ありkg', '傷あり単価', '合計kg', '金額', 'メモ', '登録日時', '支払日'];
   }
   if (kind === 'peelOut') {
     return ['id', '日付', '作業者'].concat(sizes).concat(['kg', 'メモ', '登録日時']);
@@ -410,6 +437,7 @@ function buildRowMap(kind, rec, sizes) {
     m['傷あり単価'] = bp;
     m['合計kg']     = Math.round((g + b) * 10) / 10;
     m['金額']       = Math.round(g * gp + b * bp);
+    m['支払日']     = String(rec.paid || '');
     return m;
   }
   if (kind === 'peelOut') {
@@ -492,6 +520,7 @@ function readRecords(ss, kind, sizes) {
       rec.bad  = num(col(row, '傷ありkg'));
       rec.gp   = num(col(row, '良品単価'));
       rec.bp   = num(col(row, '傷あり単価'));
+      rec.paid = dstr(col(row, '支払日'));
       out.push(rec);
       continue;
     }

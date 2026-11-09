@@ -204,6 +204,7 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
     <div><small>良品 在庫</small><b id="pk-good">0<i>kg</i></b></div>
     <div><small>傷あり 在庫</small><b id="pk-bad">0<i>kg</i></b></div>
     <div><small>生栗 未返却</small><b id="pk-open">0<i>kg</i></b></div>
+    <div><small>内職 未払い</small><b id="pk-unpaid">0<i>円</i></b></div>
   </div>
 
   <h2>生栗を内職に渡す</h2>
@@ -256,15 +257,16 @@ h3{font-size:14px;margin:20px 0 6px;color:var(--kuri-dk)}
   <h3>渋皮むき栗の出荷記録</h3>
   <div id="ps-list"></div>
 
-  <h3 style="margin-top:24px">支払明細書を作る</h3>
+  <h3 style="margin-top:24px">支払明細書を作る／支払済にする</h3>
   <div class="row">
     <div><label>作業者</label><select id="wd-who"></select></div>
     <div><label>期間 開始</label><input type="date" id="wd-from"></div>
     <div><label>期間 終了</label><input type="date" id="wd-to"></div>
+    <div><label>対象</label><select id="wd-paid"><option value="unpaid">未払いのみ</option><option value="all">すべて</option><option value="paid">支払済のみ</option></select></div>
     <div><label>お支払日</label><input id="wd-pay" placeholder="例：10月31日"></div>
   </div>
-  <button class="btn sub" id="wd-make">明細書を作成</button>
-  <p class="note">期間は空欄なら全期間で作成します。</p>
+  <div class="row"><button class="btn sub" id="wd-make">明細書を作成</button><button class="btn sub" id="wd-markpaid">この条件の記録を支払済にする</button></div>
+  <p class="note">期間は空欄なら全期間。「支払済にする」を押すと、条件に合う記録に今日の日付で支払済の印が付きます（各記録の「未払いに戻す」で取り消せます）。</p>
 </section>
 
 <!-- 加工品 -->
@@ -476,7 +478,7 @@ function normalize(d){
   });
   o.syncLog=Array.isArray(o.syncLog)?o.syncLog:[];
   o.peel=Array.isArray(o.peel)?o.peel:[];
-  o.peel.forEach(r=>{if(r.memo==null)r.memo='';['good','bad','gp','bp'].forEach(k=>{if(r[k]==null)r[k]=0})});
+  o.peel.forEach(r=>{if(r.memo==null)r.memo='';if(r.paid==null)r.paid='';['good','bad','gp','bp'].forEach(k=>{r[k]=+r[k]||0})});
   o.peelOut=Array.isArray(o.peelOut)?o.peelOut:[];
   o.peelOut.forEach(r=>{if(r.memo==null)r.memo='';if(r.who==null)r.who='';if(!r.q||typeof r.q!=='object')r.q={};const qs=sum(r.q);r.kg=qs>0?qs:(+r.kg||0)});
   o.peelShip=Array.isArray(o.peelShip)?o.peelShip:[];
@@ -730,6 +732,7 @@ function buildPeelForm(){
   const pk=peelStock();
   $('pk-good').innerHTML=fmt(pk.good)+'<i>kg</i>';$('pk-bad').innerHTML=fmt(pk.bad)+'<i>kg</i>';
   $('pk-open').innerHTML=fmt(peelOutTotal()-pk.gin-pk.bin)+'<i>kg</i>';
+  $('pk-unpaid').innerHTML=yen(D.peel.filter(r=>!r.paid).reduce((a,r)=>a+peelAmt(r),0))+'<i>円</i>';
   $('ps-good-st').textContent=`(在庫 ${fmt(pk.good)})`;$('ps-bad-st').textContent=`(在庫 ${fmt(pk.bad)})`;
   calcPeelShip();
   if(!$('w-good-p').value)$('w-good-p').value=D.peelPrice.good;
@@ -767,24 +770,45 @@ $('w-save').onclick=async()=>{
   D.peel.push(rec);
   $('w-good').value='';$('w-bad').value='';$('w-memo').value='';calcPeel();renderAll();
 };
-function cardW(r){return `<div class="card"><div class="hd"><b>${esc(r.who)}</b><span>${r.date}</span></div>
+const paidBadge=r=>r.paid?`<span style="background:#e4f0dc;color:var(--green);border-radius:999px;padding:2px 8px;font-size:12px;font-weight:700">支払済 ${esc(r.paid)}</span>`:`<span style="background:#fdf1ec;color:var(--red);border-radius:999px;padding:2px 8px;font-size:12px;font-weight:700">未払い</span>`;
+function cardW(r){return `<div class="card"><div class="hd"><b>${esc(r.who)}</b><span>${r.date}　${paidBadge(r)}</span></div>
  <div class="bd">良品 <b>${fmt(r.good)}</b> kg × ${yen(r.gp)}円　／　傷あり <b>${fmt(r.bad)}</b> kg × ${yen(r.bp)}円　＝ <b>${yen(peelAmt(r))}</b> 円${r.memo?`<br>${esc(r.memo)}`:''}</div>
- <div class="ft"><button class="btn danger" onclick="del('peel','${r.id}')">削除</button></div></div>`}
+ <div class="ft"><button class="btn tiny" onclick="togglePaid('${r.id}')">${r.paid?'未払いに戻す':'支払済にする'}</button>　<button class="btn danger" onclick="del('peel','${r.id}')">削除</button></div></div>`}
+async function markPaid(ids,paid,okMsg){
+  if(!ids.length)return toast('対象の記録がありません');
+  if(!(await send('markPaid',{ids,paid},okMsg)))return false;
+  D.peel.forEach(r=>{if(ids.includes(r.id))r.paid=paid});renderAll();return true;
+}
+function togglePaid(id){const r=D.peel.find(x=>x.id===id);if(!r)return;
+  if(r.paid)confirmBox(`${r.who} ${r.date} の記録を「未払い」に戻しますか？`,()=>markPaid([id],'','未払いに戻しました'),'未払いに戻す');
+  else markPaid([id],today(),'支払済にしました');
+}
 function renderPeelList(){
   const who=$('w-who').value,rows=D.peel.filter(r=>r.who===who).sort((a,b)=>b.date.localeCompare(a.date));
-  const g=rows.reduce((a,r)=>a+r.good,0),b=rows.reduce((a,r)=>a+r.bad,0),amt=rows.reduce((a,r)=>a+peelAmt(r),0);
-  $('w-list').innerHTML=(rows.length?`<div class="total" style="text-align:left">累計 良品 <b>${fmt(g)}</b> kg・傷あり <b>${fmt(b)}</b> kg　／　<b>${yen(amt)}</b> 円（${rows.length}回）</div>`:'')+(rows.length?rows.map(cardW).join(''):'<div class="empty">まだ記録がありません</div>');
+  const g=rows.reduce((a,r)=>a+r.good,0),b=rows.reduce((a,r)=>a+r.bad,0),amt=rows.reduce((a,r)=>a+peelAmt(r),0),unpaid=rows.filter(r=>!r.paid).reduce((a,r)=>a+peelAmt(r),0);
+  $('w-list').innerHTML=(rows.length?`<div class="total" style="text-align:left">累計 良品 <b>${fmt(g)}</b> kg・傷あり <b>${fmt(b)}</b> kg　／　<b>${yen(amt)}</b> 円（${rows.length}回）　／　未払い <b style="color:${unpaid?'var(--red)':'var(--green)'}">${yen(unpaid)}</b> 円</div>`:'')+(rows.length?rows.map(cardW).join(''):'<div class="empty">まだ記録がありません</div>');
 }
+function wdRows(){
+  const who=$('wd-who').value,f=$('wd-from').value,t=$('wd-to').value,pf=$('wd-paid').value;
+  return D.peel.filter(r=>r.who===who&&(!f||r.date>=f)&&(!t||r.date<=t)&&(pf==='all'||(pf==='paid'?!!r.paid:!r.paid))).sort((a,b)=>a.date.localeCompare(b.date));
+}
+$('wd-markpaid').onclick=()=>{
+  const rows=wdRows().filter(r=>!r.paid);
+  if(!rows.length)return toast('支払済にする未払いの記録がありません');
+  const total=rows.reduce((a,r)=>a+peelAmt(r),0);
+  confirmBox(`${$('wd-who').value} さんの ${rows.length}件（${yen(total)}円）を、本日 ${jd(today())} 支払済にしますか？`,()=>markPaid(rows.map(r=>r.id),today(),'支払済にしました'),'支払済にする');
+};
 $('wd-make').onclick=()=>{
-  const who=$('wd-who').value,f=$('wd-from').value,t=$('wd-to').value,pay=$('wd-pay').value.trim();
-  const rows=D.peel.filter(r=>r.who===who&&(!f||r.date>=f)&&(!t||r.date<=t)).sort((a,b)=>a.date.localeCompare(b.date));
+  const who=$('wd-who').value,pay=$('wd-pay').value.trim();
+  const rows=wdRows();
   if(!rows.length)return toast('該当する記録がありません');
   let g=0,b=0,total=0;
+  const allPaid=rows.every(r=>r.paid),anyPaid=rows.some(r=>r.paid);
   const lines=rows.map(r=>{g+=r.good;b+=r.bad;const a=peelAmt(r);total+=a;return `<tr><td>${r.date.slice(5).replace('-','/')}</td><td>${fmt(r.good)}</td><td>${yen(r.gp)}</td><td>${fmt(r.bad)}</td><td>${yen(r.bp)}</td><td>${yen(a)}</td></tr>`}).join('');
   showDoc(`<h1>支払明細書</h1>
    <div class="meta"><div><div class="to">${esc(who)} 様</div><div style="margin-top:6px">作業内容：栗 鬼皮剥き</div><div>対象期間：${jd(rows[0].date)} 〜 ${jd(rows[rows.length-1].date)}（${rows.length}回）</div><div>発行日：${jd(today())}</div>${pay?`<div>お支払日：${esc(pay)}</div>`:''}</div>
    <div class="from"><b>${CO.name}</b><br>${CO.zip} ${CO.addr}<br>${CO.tel}</div></div>
-   <div class="grand">お支払金額　${yen(total)} 円</div>
+   <div class="grand">お支払金額　${yen(total)} 円${allPaid?'<small>（支払済）</small>':anyPaid?'<small>（一部支払済）</small>':''}</div>
    <table><tr><th>日付</th><th>良品(kg)</th><th>単価</th><th>傷あり(kg)</th><th>単価</th><th>金額(円)</th></tr>${lines}
    <tr><td style="text-align:right"><b>合計</b></td><td><b>${fmt(g)}</b></td><td></td><td><b>${fmt(b)}</b></td><td></td><td><b>${yen(total)}</b></td></tr></table>
    <div class="foot" style="margin-top:30px;display:flex;justify-content:flex-end;gap:30px"><div>受領日：　　年　　月　　日</div><div>受領印・サイン：＿＿＿＿＿＿＿＿＿</div></div>`,
@@ -812,10 +836,10 @@ function cardPO(r){return `<div class="card"><div class="hd"><b>内職へ渡し 
 function renderPeelOut(){
   const who={};D.workers.forEach(w=>who[w]={out:0,g:0,b:0});
   D.peelOut.forEach(r=>{who[r.who]=who[r.who]||{out:0,g:0,b:0};who[r.who].out+=+r.kg||0});
-  D.peel.forEach(r=>{who[r.who]=who[r.who]||{out:0,g:0,b:0};who[r.who].g+=+r.good||0;who[r.who].b+=+r.bad||0});
+  D.peel.forEach(r=>{who[r.who]=who[r.who]||{out:0,g:0,b:0,unpaid:0};who[r.who].g+=+r.good||0;who[r.who].b+=+r.bad||0;if(!r.paid)who[r.who].unpaid=(who[r.who].unpaid||0)+peelAmt(r)});
   const ks=Object.keys(who).filter(k=>who[k].out||who[k].g||who[k].b);
-  $('po-table').innerHTML=ks.length?`<tr><th>作業者</th><th>渡した</th><th>戻った（良品）</th><th>戻った（傷あり）</th><th>未返却</th></tr>`+
-    ks.map(k=>{const w=who[k],open=w.out-w.g-w.b;return `<tr><td>${esc(k)}</td><td>${fmt(w.out)}</td><td>${fmt(w.g)}</td><td>${fmt(w.b)}</td><td class="${open<0?'neg':''}"><b>${fmt(open)}</b></td></tr>`}).join(''):
+  $('po-table').innerHTML=ks.length?`<tr><th>作業者</th><th>渡した</th><th>戻った（良品）</th><th>戻った（傷あり）</th><th>未返却</th><th>未払い(円)</th></tr>`+
+    ks.map(k=>{const w=who[k],open=w.out-w.g-w.b,up=w.unpaid||0;return `<tr><td>${esc(k)}</td><td>${fmt(w.out)}</td><td>${fmt(w.g)}</td><td>${fmt(w.b)}</td><td class="${open<0?'neg':''}"><b>${fmt(open)}</b></td><td class="${up>0?'neg':''}">${yen(up)}</td></tr>`}).join(''):
     '<tr><td class="empty">まだ記録がありません</td></tr>';
 }
 
@@ -1048,7 +1072,7 @@ $('l-csv').onclick=()=>{
   const rows=[...D.harvest.map(r=>['収穫',r.date,r.field,...D.sizes.map(s=>r.q[s]||0),sum(r.q),+r.waste||0,'','',r.memo||'']),
               ...D.buy.map(r=>['買取',r.date,r.sup,...D.sizes.map(s=>r.q[s]||0),sum(r.q),+r.waste||0,D.sizes.map(s=>`${s}:${r.p[s]||0}`).join(' '),buyAmount(r),r.memo||'']),
               ...D.ship.map(r=>['出荷',r.date,r.dest,...D.sizes.map(s=>r.q[s]||0),sum(r.q),'',r.price||'',r.price?Math.round(sum(r.q)*r.price):'',r.memo||'']),
-              ...D.peel.map(r=>['内職',r.date,r.who,...D.sizes.map(()=>''),fmt(r.good+r.bad),'',`良品${r.gp}/傷${r.bp}`,peelAmt(r),`良品${r.good}kg 傷あり${r.bad}kg ${r.memo||''}`]),
+              ...D.peel.map(r=>['内職',r.date,r.who,...D.sizes.map(()=>''),fmt(r.good+r.bad),'',`良品${r.gp}/傷${r.bp}`,peelAmt(r),`良品${r.good}kg 傷あり${r.bad}kg ${r.paid?'支払済'+r.paid:'未払い'} ${r.memo||''}`]),
               ...D.peelOut.map(r=>['内職渡し',r.date,r.who,...D.sizes.map(s=>r.q[s]||''),r.kg,'','','',r.memo||'']),
               ...D.peelShip.map(r=>['渋皮出荷',r.date,r.dest,...D.sizes.map(()=>''),fmt(r.good+r.bad),'',r.price||'',r.price?Math.round((r.good+r.bad)*r.price):'',`良品${r.good}kg 傷あり${r.bad}kg ${r.memo||''}`]),
               ...D.goods.map(r=>['加工品'+(r.dir==='in'?'入庫':'出庫'),r.date,r.item,...D.sizes.map(()=>''),r.qty+gUnit(r.item),'','','',r.memo||''])];

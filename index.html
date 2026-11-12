@@ -429,9 +429,9 @@ const DEF={
 let D=JSON.parse(JSON.stringify(DEF));
 const $=id=>document.getElementById(id);
 const today=()=>new Date().toLocaleDateString('sv-SE');
-const fmt=n=>(Math.round(n*10)/10).toLocaleString();
+const fmt=n=>(Math.round(n*100)/100).toLocaleString('ja-JP',{maximumFractionDigits:2});   // 0.05kg単位で入力することがあるので、明細書で 2.35 が 2.4 と表示されて金額と合わなく見えないように
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-const CO={name:'株式会社丹波農商',zip:'〒669-4311',addr:'兵庫県丹波市市島町上竹田915-5',tel:'TEL 050-8890-8987',inv:'登録番号 T5140001115497'};
+const CO={name:'株式会社丹波農商',zip:'〒669-4341',addr:'兵庫県丹波市市島町上竹田915-5',tel:'TEL 050-8890-8997　FAX 050-8890-8987',inv:'登録番号 T5140001115497'};
 const yen=n=>Math.round(n).toLocaleString();
 const sum=o=>Object.values(o||{}).reduce((a,b)=>a+(+b||0),0);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
